@@ -23,8 +23,8 @@ import os
 from io import BytesIO
 
 import aiohttp
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
-from quart import Quart, abort, request
 from wechatpy.exceptions import InvalidSignatureException
 
 from kirara_ai.im.adapter import IMAdapter
@@ -123,13 +123,13 @@ class WecomAdapter(IMAdapter):
 
     def __init__(self, config: WecomConfig):
         self.config = config
-        if "host" in config.__pydantic_extra__ and config.__pydantic_extra__["host"] is not None:
-            self.app = Quart(__name__)
+        if self.config.host:
+            self.app = FastAPI()
         else:
             self.app = self.web_server.app
 
         self.crypto = WeChatCrypto(
-            config.token, config.encoding_aes_key, config.corp_id or config.agent_id
+            config.token, config.encoding_aes_key, config.corp_id or config.app_id
         )
         self.client = WeChatClient(config.corp_id, config.secret)
         self.logger = get_logger("Wecom-Adapter")
@@ -149,36 +149,37 @@ class WecomAdapter(IMAdapter):
             webhook_url = self.config.webhook_url
 
         @self.app.get(webhook_url)
-        async def handle_check_request():
+        async def handle_check_request(request: Request):
             """处理 GET 请求"""
             if not self.is_running:
-                return abort(404)
-            signature = request.args.get("msg_signature", "")
-            timestamp = request.args.get("timestamp", "")
-            nonce = request.args.get("nonce", "")
-            echo_str = request.args.get("echostr", "")
+                raise HTTPException(status_code=404)
+            
+            signature = request.query_params.get("msg_signature", "")
+            timestamp = request.query_params.get("timestamp", "")
+            nonce = request.query_params.get("nonce", "")
+            echo_str = request.query_params.get("echostr", "")
             try:
                 echo_str = self.crypto.check_signature(
                     signature, timestamp, nonce, echo_str
                 )
-                return echo_str
+                return Response(content=echo_str, media_type="text/plain")
             except InvalidSignatureException:
-                return abort(403)
+                raise HTTPException(status_code=403)
 
         @self.app.post(webhook_url)
-        async def handle_message():
+        async def handle_message(request: Request):
             """处理 POST 请求"""
             if not self.is_running:
-                return abort(404)
-            signature = request.args.get("msg_signature", "")
-            timestamp = request.args.get("timestamp", "")
-            nonce = request.args.get("nonce", "")
+                raise HTTPException(status_code=404)
+            signature = request.query_params.get("msg_signature", "")
+            timestamp = request.query_params.get("timestamp", "")
+            nonce = request.query_params.get("nonce", "")
             try:
                 msg = self.crypto.decrypt_message(
-                    await request.data, signature, timestamp, nonce
+                    await request.body(), signature, timestamp, nonce
                 )
             except (InvalidSignatureException, InvalidCorpIdException):
-                return abort(403)
+                raise HTTPException(status_code=403)
             msg = parse_message(msg)
 
             # 预处理媒体消息
@@ -192,7 +193,7 @@ class WecomAdapter(IMAdapter):
             message = self.convert_to_message(msg, media_path)
             # 分发消息
             await self.dispatcher.dispatch(self, message)
-            return "ok"
+            return Response(content="ok", media_type="text/plain")
 
     def convert_to_message(self, raw_message: Any, media_path: Optional[str] = None) -> IMMessage:
         """将企业微信消息转换为统一消息格式"""
@@ -232,7 +233,7 @@ class WecomAdapter(IMAdapter):
     async def _send_text(self, user_id: str, text: str):
         """发送文本消息"""
         try:
-            return self.client.message.send_text(self.config.agent_id, user_id, text)
+            return self.client.message.send_text(self.config.app_id, user_id, text)
         except Exception as e:
             self.logger.error(f"Failed to send text message: {e}")
 
@@ -243,7 +244,7 @@ class WecomAdapter(IMAdapter):
             media_id = self.client.media.upload(
                 media_type, media_bytes)["media_id"]
             send_method = getattr(self.client.message, f"send_{media_type}")
-            return send_method(self.config.agent_id, user_id, media_id)
+            return send_method(self.config.app, user_id, media_id)
         except Exception as e:
             self.logger.error(f"Failed to send {media_type} message: {e}")
 
