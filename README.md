@@ -34,27 +34,32 @@
 * [调试群](https://jq.qq.com/?_wv=1027&k=TBX8Saq7) 这个群里有很多 ChatGPT QQ 机器人，不解答技术问题。 
 
 
-**📷 Showcases**  
+## 📷 Showcases 
 
 | ![猫娘问答](https://img.shields.io/badge/-%E7%8C%AB%E5%A8%98%E9%97%AE%E7%AD%94-E2CDBC?style=for-the-badge)                     | ![生活助手](https://img.shields.io/badge/-生活助手-E2CDBC?style=for-the-badge)                   | ![文字 RPG](https://img.shields.io/badge/-文字RPG-E2CDBC?style=for-the-badge)            |
 |------------------------------|------------------------------|------------------------------|
 | ![image](https://user-images.githubusercontent.com/8984680/230702158-73967aa9-01be-44d6-bbd9-24437e333140.png) | ![image](https://user-images.githubusercontent.com/8984680/230702177-de96f89b-053e-4313-a131-715af969db04.png) | ![image](https://user-images.githubusercontent.com/8984680/230702635-fb1de3bf-acbd-46ca-8d6f-caa47368b4d4.png) |
 
-**🧭 WebUI**  
+## 🧭 WebUI  
 
-![模型管理](https://img.shields.io/badge/-%E6%A8%A1%E5%9E%8B%E7%AE%A1%E7%90%86-E2CDBC?style=for-the-badge)  
+<div align="center">  
 
-![image](https://github.com/user-attachments/assets/322e6fb0-307a-458b-8fa6-970a6344ee1f)  
+<h3 align="center">模型管理</h3>  
 
-![工作流](https://img.shields.io/badge/-%E5%B7%A5%E4%BD%9C%E6%B5%81-E2CDBC?style=for-the-badge)
+![image](https://github.com/user-attachments/assets/0839bff6-47d4-4fe2-a326-056185ef1ad4)
 
-![image](https://github.com/user-attachments/assets/4f259269-e06e-4bad-a97c-58b92cfb38cd)
 
-![插件市场](https://img.shields.io/badge/-%E6%8F%92%E4%BB%B6%E5%B8%82%E5%9C%BA-E2CDBC?style=for-the-badge)
+<h3 align="center">工作流</h3>  
 
-![image](https://github.com/user-attachments/assets/f41278ed-ab25-4a13-9e15-e12a3373b5be)
+![image](https://github.com/user-attachments/assets/c8ded878-3cf9-4c70-925d-ee29027674ff)
 
-**⚡ 核心特性**   
+<h3 align="center">插件市场</h3>  
+
+![image](https://github.com/user-attachments/assets/d734be88-e8f6-4b95-aba8-02a544ab7a9f)
+
+</div>
+
+## ⚡ 核心特性
 * [x] 图片发送
 * [x] 关键词触发回复
 * [x] 多账号支持
@@ -73,7 +78,7 @@
 * [x] 支持 Web 管理后台
 * [x] 内置 Frpc 内网穿透
 
-**🤖 聊天平台**  
+# **🤖 聊天平台**  
 
 我们支持多种聊天平台。  
 
@@ -83,7 +88,7 @@
 | QQ 机器人 | 支持   | 支持   | 支持 | 支持  | 支持  | 平台不支持   |
 | Discord  | 重构中   | 重构中   | 重构中 | 重构中  | 重构中  | 重构中   |
 | 飞书机器人  | 重构中   | 重构中   | 重构中 | 重构中  | 重构中  | 重构中   |
-| 企业微信 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
+| 企业微信应用 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
 | 微信公众号 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
 | OneBot   | 插件支持   | 插件支持   | 插件支持   | 插件支持    | 插件支持  | 插件支持   |
 
