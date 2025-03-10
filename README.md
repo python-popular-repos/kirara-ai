@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://github.com/lss233/kirara-ai/stargazers"><img src="https://img.shields.io/github/stars/lss233/kirara-ai?color=E2CDBC&amp;logo=github&amp;style=for-the-badge" alt="Github stars"></a>
   <a href="https://github.com/lss233/kirara-ai/actions/workflows/docker-latest.yml"><img src="https://img.shields.io/github/actions/workflow/status/lss233/kirara-ai/docker-latest.yml?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker build latest"></a>
-  <a href="https://hub.docker.com/r/lss233/kirara-ai/"><img src="https://img.shields.io/docker/pulls/lss233/kirara-ai?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker Pulls"></a>
+  <a href="https://hub.docker.com/r/lss233/kirara-ai/"><img src="https://img.shields.io/docker/pulls/lss233/kirara-agent-framework?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker Pulls"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/lss233/kirara-ai?&amp;color=E2CDBC&amp;style=for-the-badge" alt="License"></a>
 </p>
 
@@ -242,6 +242,7 @@ Made with [contrib.rocks](https://contrib.rocks).
 
 - [Kirara Registry](https://github.com/DarkSkyTeam/kirara-registry) - Kirara AI 插件市场
 - [Kirara WebUI](https://github.com/DarkSkyTeam/kirara-webui) - Kirara AI 的 WebUI 前端项目
+- [Kirara Docs](https://github.com/DarkSkyTeam/kirara-docs) - Kirara AI 的使用手册原始文档
 
 ## 💪 支持我们
 
