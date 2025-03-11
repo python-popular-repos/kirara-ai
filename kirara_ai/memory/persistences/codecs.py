@@ -3,6 +3,7 @@ from datetime import datetime
 from types import FunctionType
 
 from kirara_ai.im.sender import ChatSender, ChatType
+from kirara_ai.logger import get_logger
 
 
 class MemoryJSONEncoder(json.JSONEncoder):
@@ -29,7 +30,11 @@ class MemoryJSONEncoder(json.JSONEncoder):
                 "kwdefaults": obj.__kwdefaults__,
                 "doc": obj.__doc__,
             }
-        return super().default(obj)
+        try:
+            return super().default(obj)
+        except Exception as e:
+            get_logger("MemoryJSONEncoder").warning(f"failed to encode object: {e}")
+            return None
 
 
 def memory_json_decoder(obj):

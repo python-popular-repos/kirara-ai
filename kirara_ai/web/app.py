@@ -242,8 +242,8 @@ class WebServer:
     async def stop(self):
         """停止Web服务器"""
         self.shutdown_event.set()
+        
         if self.server_task:
-            self.server_task.cancel()
             try:
                 await self.server_task
             except asyncio.CancelledError:

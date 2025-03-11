@@ -1,40 +1,26 @@
-import uuid
-from typing import Any, Optional
-
-from kirara_ai.im.sender import ChatSender
-from kirara_ai.web.app import WebServer
-from kirara_ai.workflow.core.dispatch.dispatcher import WorkflowDispatcher
-
-# 兼容新旧版本的 wechatpy 导入
-try:
-    from wechatpy.enterprise import parse_message
-    from wechatpy.enterprise.client import WeChatClient
-    from wechatpy.enterprise.crypto import WeChatCrypto
-    from wechatpy.enterprise.exceptions import InvalidCorpIdException
-except ImportError:
-    from wechatpy.work.crypto import WeChatCrypto
-    from wechatpy.work.client import WeChatClient
-    from wechatpy.work.exceptions import InvalidCorpIdException
-    from wechatpy.work import parse_message
-
 import asyncio
 import base64
 import os
+import uuid
 from io import BytesIO
+from typing import Any, Optional
 
 import aiohttp
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from wechatpy.exceptions import InvalidSignatureException
+from wechatpy.replies import create_reply
 
 from kirara_ai.im.adapter import IMAdapter
 from kirara_ai.im.message import FileElement, ImageMessage, IMMessage, TextMessage, VideoElement, VoiceMessage
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.logger import HypercornLoggerWrapper, get_logger
+from kirara_ai.web.app import WebServer
+from kirara_ai.workflow.core.dispatch.dispatcher import WorkflowDispatcher
 
 WECOM_TEMP_DIR = os.path.join(os.getcwd(), 'data', 'temp', 'wecom')
 
 WEBHOOK_URL_PREFIX = "/im/webhook/wechat"
-
 
 def make_webhook_url():
     return f"{WEBHOOK_URL_PREFIX}/{str(uuid.uuid4())[:8]}"
@@ -120,18 +106,15 @@ class WecomAdapter(IMAdapter):
 
     dispatcher: WorkflowDispatcher
     web_server: WebServer
-
+    
     def __init__(self, config: WecomConfig):
         self.config = config
         if self.config.host:
             self.app = FastAPI()
         else:
             self.app = self.web_server.app
-
-        self.crypto = WeChatCrypto(
-            config.token, config.encoding_aes_key, config.corp_id or config.app_id
-        )
-        self.client = WeChatClient(config.corp_id, config.secret)
+            
+        self.setup_wechat_api()
         self.logger = get_logger("Wecom-Adapter")
         self.is_running = False
         if not self.config.host:
@@ -141,35 +124,70 @@ class WecomAdapter(IMAdapter):
             self.config.port = 15650
         if not self.config.webhook_url:
             self.config.webhook_url = make_webhook_url()
-
+        
+        self.reply_tasks = {}
+        
+    def setup_wechat_api(self):
+        if self.config.corp_id:
+            from wechatpy.enterprise import parse_message
+            from wechatpy.enterprise.client import WeChatClient
+            from wechatpy.enterprise.crypto import WeChatCrypto
+            self.crypto = WeChatCrypto(
+                self.config.token, self.config.encoding_aes_key, self.config.corp_id
+            )
+            self.client = WeChatClient(self.config.corp_id, self.config.secret)
+            self.parse_message = parse_message
+        else:
+            from wechatpy import WeChatClient
+            from wechatpy.crypto import WeChatCrypto
+            from wechatpy.parser import parse_message
+            self.crypto = WeChatCrypto(
+                self.config.token, self.config.encoding_aes_key, self.config.app_id
+            )
+            self.client = WeChatClient(self.config.app_id, self.config.secret)
+            self.parse_message = parse_message
+            
     def setup_routes(self):
-        if "host" in self.config.__pydantic_extra__:
+        if self.config.host:
             webhook_url = '/wechat'
         else:
             webhook_url = self.config.webhook_url
-
+        # unregister old route if exists
+        for route in self.app.routes:
+            if route.path == webhook_url:
+                self.app.routes.remove(route)
+        
         @self.app.get(webhook_url)
         async def handle_check_request(request: Request):
             """处理 GET 请求"""
             if not self.is_running:
+                self.logger.warning("Wecom-Adapter is not running, skipping check request.")
                 raise HTTPException(status_code=404)
             
             signature = request.query_params.get("msg_signature", "")
             timestamp = request.query_params.get("timestamp", "")
             nonce = request.query_params.get("nonce", "")
             echo_str = request.query_params.get("echostr", "")
-            try:
-                echo_str = self.crypto.check_signature(
-                    signature, timestamp, nonce, echo_str
-                )
+
+
+            try:            
+                if self.config.corp_id:
+                    echo_str = self.crypto.check_signature(
+                        signature, timestamp, nonce, echo_str
+                    )
+                else:
+                    from wechatpy.utils import check_signature
+                    check_signature(self.config.token, signature, timestamp, nonce)
                 return Response(content=echo_str, media_type="text/plain")
             except InvalidSignatureException:
+                self.logger.error("failed to check signature, please check your settings.")
                 raise HTTPException(status_code=403)
 
         @self.app.post(webhook_url)
         async def handle_message(request: Request):
             """处理 POST 请求"""
             if not self.is_running:
+                self.logger.warning("Wecom-Adapter is not running, skipping message request.")
                 raise HTTPException(status_code=404)
             signature = request.query_params.get("msg_signature", "")
             timestamp = request.query_params.get("timestamp", "")
@@ -178,10 +196,17 @@ class WecomAdapter(IMAdapter):
                 msg = self.crypto.decrypt_message(
                     await request.body(), signature, timestamp, nonce
                 )
-            except (InvalidSignatureException, InvalidCorpIdException):
+            except InvalidSignatureException:
+                self.logger.error("failed to check signature, please check your settings.")
                 raise HTTPException(status_code=403)
-            msg = parse_message(msg)
-
+            msg = self.parse_message(msg)
+            
+            if msg.id in self.reply_tasks:
+                self.logger.debug(f"skip processing due to duplicate msgid: {msg.id}")
+                reply = await self.reply_tasks[msg.id]
+                del self.reply_tasks[msg.id]
+                return Response(content=create_reply(reply, msg).render(), media_type="text/xml")
+            
             # 预处理媒体消息
             media_path = None
             if msg.type in ["voice", "video", "file"]:
@@ -191,9 +216,13 @@ class WecomAdapter(IMAdapter):
 
             # 转换消息
             message = self.convert_to_message(msg, media_path)
+            self.reply_tasks[msg.id] = asyncio.Future()
+            message.sender.raw_metadata["reply"] = self.reply_tasks[msg.id]
             # 分发消息
-            await self.dispatcher.dispatch(self, message)
-            return Response(content="ok", media_type="text/plain")
+            asyncio.create_task(self.dispatcher.dispatch(self, message))
+            reply = await message.sender.raw_metadata["reply"]
+            del message.sender.raw_metadata["reply"]
+            return Response(content=create_reply(reply, msg).render(), media_type="text/xml")
 
     def convert_to_message(self, raw_message: Any, media_path: Optional[str] = None) -> IMMessage:
         """将企业微信消息转换为统一消息格式"""
@@ -236,6 +265,7 @@ class WecomAdapter(IMAdapter):
             return self.client.message.send_text(self.config.app_id, user_id, text)
         except Exception as e:
             self.logger.error(f"Failed to send text message: {e}")
+            raise e
 
     async def _send_media(self, user_id: str, media_data: str, media_type: str):
         """发送媒体消息的通用方法"""
@@ -247,24 +277,33 @@ class WecomAdapter(IMAdapter):
             return send_method(self.config.app, user_id, media_id)
         except Exception as e:
             self.logger.error(f"Failed to send {media_type} message: {e}")
+            raise e
 
     async def send_message(self, message: IMMessage, recipient: ChatSender):
         """发送消息到企业微信"""
         user_id = recipient.user_id
         res = None
-        for element in message.message_elements:
-            if isinstance(element, TextMessage) and element.text:
-                res = await self._send_text(user_id, element.text)
-            elif isinstance(element, ImageMessage) and element.url:
-                res = await self._send_media(user_id, element.url, "image")
-            elif isinstance(element, VoiceMessage) and element.url:
-                res = await self._send_media(user_id, element.url, "voice")
-            elif isinstance(element, VideoElement) and element.file:
-                res = await self._send_media(user_id, element.file, "video")
-            elif isinstance(element, FileElement) and element.path:
-                res = await self._send_media(user_id, element.path, "file")
-        if res:
-            print(res)
+        
+        try:
+            for element in message.message_elements:
+                if isinstance(element, TextMessage) and element.text:
+                    res = await self._send_text(user_id, element.text)
+                elif isinstance(element, ImageMessage) and element.url:
+                    res = await self._send_media(user_id, element.url, "image")
+                elif isinstance(element, VoiceMessage) and element.url:
+                    res = await self._send_media(user_id, element.url, "voice")
+                elif isinstance(element, VideoElement) and element.file:
+                    res = await self._send_media(user_id, element.file, "video")
+                elif isinstance(element, FileElement) and element.path:
+                    res = await self._send_media(user_id, element.path, "file")
+            if res:
+                print(res)
+            recipient.raw_metadata["reply"].set_result(None)
+        except Exception as e:
+            if 'Error code: 48001' in str(e):
+                # 未开通主动回复能力
+                self.logger.warning("未开通主动回复能力，将采用被动回复消息 API，此模式下只能回复一条消息。")
+                recipient.raw_metadata["reply"].set_result(message.content)
 
     async def _start_standalone_server(self):
         """启动服务"""
@@ -294,12 +333,16 @@ class WecomAdapter(IMAdapter):
                 self.logger.error(f"Error during server shutdown: {e}")
 
     async def start(self):
+        self.setup_wechat_api()
         if self.config.host:
             self.logger.warning("正在使用过时的启动模式，请尽快更新为 Webhook 模式。")
             await self._start_standalone_server()
         self.setup_routes()
+        self.is_running = True
+        self.logger.info("Wecom-Adapter 启动成功")
 
     async def stop(self):
         if self.config.host:
             await self._stop_standalone_server()
         self.is_running = False
+        self.logger.info("Wecom-Adapter 停止成功")

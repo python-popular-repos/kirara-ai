@@ -333,7 +333,12 @@ class IMMessage:
     @property
     def content(self) -> str:
         """获取消息的纯文本内容"""
-        return "".join([element.to_plain() for element in self.message_elements])
+        content = ""
+        for element in self.message_elements:
+            content += element.to_plain()
+            if isinstance(element, TextMessage):
+                content += "\n"
+        return content.strip()
 
     @property
     def images(self) -> List[ImageMessage]:
