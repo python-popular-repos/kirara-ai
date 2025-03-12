@@ -1,5 +1,8 @@
 import aiohttp
 import requests
+import base64
+import imghdr
+import io
 from pydantic import BaseModel, ConfigDict
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
@@ -16,9 +19,52 @@ class GeminiConfig(BaseModel):
 
 
 def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
+    parts = []
+
+    # 处理内容是列表的情况
+    if isinstance(msg.content, list):
+
+        for item in msg.content:
+
+            if item["type"] == "text":
+                parts.append({"text": item["text"]})
+            elif item["type"] == "image_url":
+                # 获取图片的base64编码
+                image_url = item["image_url"]["url"]
+                try:
+                    if image_url.startswith("http"):
+                        print(image_url)
+                        from curl_cffi import requests as requests1
+                        response = requests1.get(image_url)
+                        response.raise_for_status()
+                        image_data = response.content
+                        base64_data = base64.b64encode(image_data).decode('utf-8')
+                    else:
+                        # 假设输入的是base64字符串
+                        base64_data = image_url
+                        # 解码base64以检测图片格式
+                        image_data = base64.b64decode(base64_data)
+                    # 检测图片格式
+                    image_format = imghdr.what(None, image_data)
+                    if image_format is None:
+                        continue
+
+                    parts.append({
+                        "inline_data": {
+                            "mime_type": f"image/{image_format}",
+                            "data": base64_data
+                        }
+                    })
+                except Exception as e:
+                    print(e)
+                    continue
+    else:
+        # 处理内容是字符串的情况
+        parts.append({"text": msg.content})
+
     return {
         "role": "model" if msg.role == "assistant" else "user",
-        "parts": [{"text": msg.content}],
+        "parts": parts
     }
 
 
@@ -51,8 +97,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         self.logger.debug(f"Contents: {data['contents']}")
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
-
-        response = requests.post(api_url, json=data, headers=headers)
+        response = requests.post(api_url, json=data, headers=headers,proxies={"https":"http://127.0.0.1:7890"})
         try:
             response.raise_for_status()
             response_data = response.json()
