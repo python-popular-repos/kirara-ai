@@ -30,6 +30,8 @@ from kirara_ai.workflow.implementations.workflows import register_system_workflo
 
 logger = get_logger("Entrypoint")
 
+_interrupt_count = 0  # 添加计数器
+
 async def check_update():
     """检查更新"""
     running_version = get_installed_version()
@@ -43,8 +45,18 @@ async def check_update():
 
 # 注册信号处理函数
 def _signal_handler(*args):
-    logger.warning("Interrupt signal received. Stopping application...")
-    shutdown_event.set()
+    global _interrupt_count
+    _interrupt_count += 1
+    
+    if _interrupt_count == 1:
+        if not shutdown_event.is_set():
+            logger.warning("Interrupt signal received. Stopping application...")
+            shutdown_event.set()
+    elif _interrupt_count == 2:
+        logger.warning("Interrupt signal received again. Press Ctrl+C one more time to force shutdown...")
+    else:
+        logger.warning("Interrupt signal received for the third time. Forcing shutdown...")
+        os._exit(1)
 
 
 def init_container() -> DependencyContainer:
