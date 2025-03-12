@@ -33,7 +33,6 @@ def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
                 image_url = item["image_url"]["url"]
                 try:
                     if image_url.startswith("http"):
-                        print(image_url)
                         from curl_cffi import requests as requests1
                         response = requests1.get(image_url)
                         response.raise_for_status()
@@ -79,7 +78,22 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-
+        safety_settings = [{
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
+            "threshold": "BLOCK_NONE"
+        }]
         data = {
             "contents": [
                 convert_llm_chat_message_to_gemini_message(msg) for msg in req.messages
@@ -91,13 +105,13 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "maxOutputTokens": req.max_tokens,
                 "stopSequences": req.stop,
             },
-            "safetySettings": [],
+            "safetySettings": safety_settings,
         }
 
         self.logger.debug(f"Contents: {data['contents']}")
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
-        response = requests.post(api_url, json=data, headers=headers,proxies={"https":"http://127.0.0.1:7890"})
+        response = requests.post(api_url, json=data, headers=headers)
         try:
             response.raise_for_status()
             response_data = response.json()
