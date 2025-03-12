@@ -8,6 +8,7 @@ from typing import Any, Optional
 import aiohttp
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
+from wechatpy.client import BaseWeChatClient
 from wechatpy.exceptions import InvalidSignatureException
 from wechatpy.replies import create_reply
 
@@ -17,6 +18,8 @@ from kirara_ai.im.sender import ChatSender
 from kirara_ai.logger import HypercornLoggerWrapper, get_logger
 from kirara_ai.web.app import WebServer
 from kirara_ai.workflow.core.dispatch.dispatcher import WorkflowDispatcher
+
+from .delegates import CorpWechatApiDelegate, PublicWechatApiDelegate
 
 WECOM_TEMP_DIR = os.path.join(os.getcwd(), 'data', 'temp', 'wecom')
 
@@ -68,9 +71,13 @@ class WecomConfig(BaseModel):
 class WeComUtils:
     """企业微信相关的工具类"""
 
-    def __init__(self, access_token: str):
-        self.access_token = access_token
+    def __init__(self, client: BaseWeChatClient):
+        self.client = client
         self.logger = get_logger("WeComUtils")
+        
+    @property
+    def access_token(self) -> str:
+        return self.client.access_token
 
     async def download_and_save_media(self, media_id: str, file_name: str) -> Optional[str]:
         """下载并保存媒体文件到本地"""
@@ -114,7 +121,6 @@ class WecomAdapter(IMAdapter):
         else:
             self.app = self.web_server.app
             
-        self.setup_wechat_api()
         self.logger = get_logger("Wecom-Adapter")
         self.is_running = False
         if not self.config.host:
@@ -127,25 +133,20 @@ class WecomAdapter(IMAdapter):
         
         self.reply_tasks = {}
         
+        # 根据配置选择合适的API代理
+        self.setup_wechat_api()
+        
     def setup_wechat_api(self):
+        """根据配置设置微信API代理"""
         if self.config.corp_id:
-            from wechatpy.enterprise import parse_message
-            from wechatpy.enterprise.client import WeChatClient
-            from wechatpy.enterprise.crypto import WeChatCrypto
-            self.crypto = WeChatCrypto(
-                self.config.token, self.config.encoding_aes_key, self.config.corp_id
-            )
-            self.client = WeChatClient(self.config.corp_id, self.config.secret)
-            self.parse_message = parse_message
+            self.api_delegate = CorpWechatApiDelegate()
         else:
-            from wechatpy import WeChatClient
-            from wechatpy.crypto import WeChatCrypto
-            from wechatpy.parser import parse_message
-            self.crypto = WeChatCrypto(
-                self.config.token, self.config.encoding_aes_key, self.config.app_id
-            )
-            self.client = WeChatClient(self.config.app_id, self.config.secret)
-            self.parse_message = parse_message
+            self.api_delegate = PublicWechatApiDelegate()
+        
+        self.api_delegate.setup_api(self.config)
+        
+        # 设置工具类
+        self.wecom_utils = WeComUtils(self.api_delegate.client)
             
     def setup_routes(self):
         if self.config.host:
@@ -165,19 +166,16 @@ class WecomAdapter(IMAdapter):
                 raise HTTPException(status_code=404)
             
             signature = request.query_params.get("msg_signature", "")
+            if not signature:
+                signature = request.query_params.get("signature", "")
             timestamp = request.query_params.get("timestamp", "")
             nonce = request.query_params.get("nonce", "")
             echo_str = request.query_params.get("echostr", "")
 
-
             try:            
-                if self.config.corp_id:
-                    echo_str = self.crypto.check_signature(
-                        signature, timestamp, nonce, echo_str
-                    )
-                else:
-                    from wechatpy.utils import check_signature
-                    check_signature(self.config.token, signature, timestamp, nonce)
+                echo_str = self.api_delegate.check_signature(
+                    signature, timestamp, nonce, echo_str
+                )
                 return Response(content=echo_str, media_type="text/plain")
             except InvalidSignatureException:
                 self.logger.error("failed to check signature, please check your settings.")
@@ -190,16 +188,18 @@ class WecomAdapter(IMAdapter):
                 self.logger.warning("Wecom-Adapter is not running, skipping message request.")
                 raise HTTPException(status_code=404)
             signature = request.query_params.get("msg_signature", "")
+            if not signature:
+                signature = request.query_params.get("signature", "")
             timestamp = request.query_params.get("timestamp", "")
             nonce = request.query_params.get("nonce", "")
             try:
-                msg = self.crypto.decrypt_message(
+                msg = self.api_delegate.decrypt_message(
                     await request.body(), signature, timestamp, nonce
                 )
             except InvalidSignatureException:
                 self.logger.error("failed to check signature, please check your settings.")
                 raise HTTPException(status_code=403)
-            msg = self.parse_message(msg)
+            msg = self.api_delegate.parse_message(msg)
             
             if msg.id in self.reply_tasks:
                 self.logger.debug(f"skip processing due to duplicate msgid: {msg.id}")
@@ -262,7 +262,7 @@ class WecomAdapter(IMAdapter):
     async def _send_text(self, user_id: str, text: str):
         """发送文本消息"""
         try:
-            return self.client.message.send_text(self.config.app_id, user_id, text)
+            return await self.api_delegate.send_text(self.config.app_id, user_id, text)
         except Exception as e:
             self.logger.error(f"Failed to send text message: {e}")
             raise e
@@ -271,10 +271,7 @@ class WecomAdapter(IMAdapter):
         """发送媒体消息的通用方法"""
         try:
             media_bytes = BytesIO(base64.b64decode(media_data))
-            media_id = self.client.media.upload(
-                media_type, media_bytes)["media_id"]
-            send_method = getattr(self.client.message, f"send_{media_type}")
-            return send_method(self.config.app, user_id, media_id)
+            return await self.api_delegate.send_media(self.config.app_id, user_id, media_type, media_bytes)
         except Exception as e:
             self.logger.error(f"Failed to send {media_type} message: {e}")
             raise e

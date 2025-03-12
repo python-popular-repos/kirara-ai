@@ -1,13 +1,14 @@
 import os
 
-from im_wecom_adapter.adapter import WecomAdapter, WecomConfig
-
 from kirara_ai.logger import get_logger
 from kirara_ai.plugin_manager.plugin import Plugin
 from kirara_ai.web.app import WebServer
 
+from .adapter import WecomAdapter, WecomConfig
+
 logger = get_logger("Wecom-Adapter")
 
+__all__ = ["WecomAdapter", "WecomConfig"]
 
 class WecomAdapterPlugin(Plugin):
     web_server: WebServer
