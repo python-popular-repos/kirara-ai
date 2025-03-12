@@ -13,10 +13,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lss233/chatgpt-mirai-qq-bot/stargazers"><img src="https://img.shields.io/github/stars/lss233/chatgpt-mirai-qq-bot?color=E2CDBC&amp;logo=github&amp;style=for-the-badge" alt="Github stars"></a>
-  <a href="https://github.com/lss233/chatgpt-mirai-qq-bot/actions/workflows/docker-latest.yml"><img src="https://img.shields.io/github/actions/workflow/status/lss233/chatgpt-mirai-qq-bot/docker-latest.yml?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker build latest"></a>
-  <a href="https://hub.docker.com/r/lss233/chatgpt-mirai-qq-bot/"><img src="https://img.shields.io/docker/pulls/lss233/chatgpt-mirai-qq-bot?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker Pulls"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/lss233/chatgpt-mirai-qq-bot?&amp;color=E2CDBC&amp;style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/lss233/kirara-ai/stargazers"><img src="https://img.shields.io/github/stars/lss233/kirara-ai?color=E2CDBC&amp;logo=github&amp;style=for-the-badge" alt="Github stars"></a>
+  <a href="https://github.com/lss233/kirara-ai/actions/workflows/docker-latest.yml"><img src="https://img.shields.io/github/actions/workflow/status/lss233/kirara-ai/docker-latest.yml?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker build latest"></a>
+  <a href="https://hub.docker.com/r/lss233/kirara-ai/"><img src="https://img.shields.io/docker/pulls/lss233/kirara-agent-framework?color=E2CDBC&amp;logo=docker&amp;logoColor=white&amp;style=for-the-badge" alt="Docker Pulls"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/lss233/kirara-ai?&amp;color=E2CDBC&amp;style=for-the-badge" alt="License"></a>
 </p>
 
 ***
@@ -26,50 +26,71 @@
   [QQ 三群](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=urlhCH8y7Ro2S-iXt63X4s5eILUny4Iw&authKey=ejiwoNa4Yez6IMLyf2vj%2FeRiC1frdFrNNekbRfaPnSQbcD7bgebo5y5A7rPaRKBq&noverify=0&group_code=533109074)、
   [QQ 四群](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Ibiu6EmXof30Fa7MJ5j8nJFwaUGTf5bM&authKey=YKx5a%2BK5qnWkk5VlsxxDfYl0nCrKSekQm%2FoLQVqr%2FcO%2FQY2S6N24XdI23XugBrF0&noverify=0&group_code=799737883)、
   [QQ 五群](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=lDkVPDAeiz6M-ig9cdS9tqhSH6_topox&authKey=B%2FRPYVUjk3dYPw5D4o6C2TpqeoKTG0nXEiKDCG%2Bh4JYY2RPqDQGt37SGl32j0hHw&noverify=0&group_code=805081636)、
+  [QQ 六群](https://qm.qq.com/q/UpvYm3jccg)、
   [QQ 开发群](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=lisyXibhUj93DgIZptQu3VZ4ka3F5-rW&authKey=PBCzRQX4Zei%2BB6n5Tdyp9p5bqcF0tLBlfGANT4dSSKQIFYR66WwaZSMEDahWo%2FzZ&noverify=0&group_code=701933732)  
   会发布最新的项目动态、视频教程、问题答疑和交流。 
-  加群之前先看[这里](https://github.com/lss233/chatgpt-mirai-qq-bot/issues)的内容能不能解决你的问题。  
+  加群之前先看[这里](https://github.com/lss233/kirara-ai/issues)的内容能不能解决你的问题。  
   如果不能解决，把遇到的问题、**日志**和配置文件准备好后再提问。
 * [调试群](https://jq.qq.com/?_wv=1027&k=TBX8Saq7) 这个群里有很多 ChatGPT QQ 机器人，不解答技术问题。 
+
+
+## 📷 Showcases 
 
 | ![猫娘问答](https://img.shields.io/badge/-%E7%8C%AB%E5%A8%98%E9%97%AE%E7%AD%94-E2CDBC?style=for-the-badge)                     | ![生活助手](https://img.shields.io/badge/-生活助手-E2CDBC?style=for-the-badge)                   | ![文字 RPG](https://img.shields.io/badge/-文字RPG-E2CDBC?style=for-the-badge)            |
 |------------------------------|------------------------------|------------------------------|
 | ![image](https://user-images.githubusercontent.com/8984680/230702158-73967aa9-01be-44d6-bbd9-24437e333140.png) | ![image](https://user-images.githubusercontent.com/8984680/230702177-de96f89b-053e-4313-a131-715af969db04.png) | ![image](https://user-images.githubusercontent.com/8984680/230702635-fb1de3bf-acbd-46ca-8d6f-caa47368b4d4.png) |
 
+## 🧭 WebUI  
+
+<div align="center">  
+
+<h3 align="center">模型管理</h3>  
+
+![image](https://github.com/user-attachments/assets/0839bff6-47d4-4fe2-a326-056185ef1ad4)
 
 
+<h3 align="center">工作流</h3>  
 
-**⚡ 核心特性**   
+![image](https://github.com/user-attachments/assets/c8ded878-3cf9-4c70-925d-ee29027674ff)
+
+<h3 align="center">插件市场</h3>  
+
+![image](https://github.com/user-attachments/assets/d734be88-e8f6-4b95-aba8-02a544ab7a9f)
+
+</div>
+
+## ⚡ 核心特性
 * [x] 图片发送
 * [x] 关键词触发回复
 * [x] 多账号支持
-* [x] 百度云内容审核
-* [x] 额度限制 
 * [x] 人格设定
 * [x] 支持 QQ、Telegram、Discord、微信  
 * [x] 可作为 HTTP 服务端提供 Web API
-* [x] 支持 OpenAI、DeepSeek、Claude、Gemini、Qwen 等主流大模型
+* [x] 支持 OpenAI、DeepSeek、Claude、Gemini、Qwen、Mistral、豆包、Minimax、Kimi、Mistral 等主流大模型
 * [x] 支持插件机制
 * [x] 支持条件触发
 * [x] 支持管理员指令
-* [x] 支持 Stable Diffusion、Midjourney 等绘图模型
+* [x] 支持 Stable Diffusion、Flux、Midjourney 等绘图模型
 * [x] 支持语音回复
 * [x] 支持多轮对话
 * [x] 支持跨平台消息发送
 * [x] 支持自定义工作流
 * [x] 支持 Web 管理后台
+* [x] 内置 Frpc 内网穿透
 
-**🤖 技术架构**  
+# **🤖 聊天平台**  
 
 我们支持多种聊天平台。  
 
 | 平台       | 群聊回复 | 私聊回复 | 条件触发 | 管理员指令 | 绘图  | 语音回复 |
 |----------|------|------|------|-------|-----|------|
-| Telegram | 支持   | 支持   | 部分支持 | 部分支持  | 支持  | 支持   |
-| Discord  | 支持   | 支持   | 部分支持 | 不支持   | 支持  | 支持   |
-| 企业微信 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
+| Telegram | 支持   | 支持   | 支持 | 支持  | 支持  | 支持   |
+| QQ 机器人 | 支持   | 支持   | 支持 | 支持  | 支持  | 平台不支持   |
+| Discord  | 重构中   | 重构中   | 重构中 | 重构中  | 重构中  | 重构中   |
+| 飞书机器人  | 重构中   | 重构中   | 重构中 | 重构中  | 重构中  | 重构中   |
+| 企业微信应用 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
+| 微信公众号 | 支持   | 支持   | 支持 | 不支持  | 支持  | 支持   |
 | OneBot   | 插件支持   | 插件支持   | 插件支持   | 插件支持    | 插件支持  | 插件支持   |
-| 微信 | 第三方支持   | 第三方支持   | 第三方支持 | 不支持  | 第三方支持  | 第三方支持   |
 
 ## 🐎 命令
 
@@ -195,7 +216,7 @@
 * 小黑子：https://www.bilibili.com/video/av309604568
 * 高启强：https://www.bilibili.com/video/av779555493
 
-关于预设系统的详细教程：[Wiki](https://github.com/lss233/chatgpt-mirai-qq-bot/wiki/%F0%9F%90%B1-%E9%A2%84%E8%AE%BE%E7%B3%BB%E7%BB%9F)
+关于预设系统的详细教程：[Wiki](https://github.com/lss233/kirara-ai/wiki/%F0%9F%90%B1-%E9%A2%84%E8%AE%BE%E7%B3%BB%E7%BB%9F)
 
 你可以在 [Awesome ChatGPT QQ Presets](https://github.com/lss233/awesome-chatgpt-qq-presets/tree/master) 获取由大家分享的预设。
 
@@ -211,13 +232,20 @@
 
 欢迎提出新的点子、 Pull Request。  
 
-<a href="https://github.com/lss233/chatgpt-mirai-qq-bot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=lss233/chatgpt-mirai-qq-bot" />
+<a href="https://github.com/lss233/kirara-ai/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lss233/kirara-ai" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
 
+## 📕 相关项目
+
+- [Kirara Registry](https://github.com/DarkSkyTeam/kirara-registry) - Kirara AI 插件市场
+- [Kirara WebUI](https://github.com/DarkSkyTeam/kirara-webui) - Kirara AI 的 WebUI 前端项目
+- [Kirara Docs](https://github.com/DarkSkyTeam/kirara-docs) - Kirara AI 的使用手册原始文档
+
 ## 💪 支持我们
 
-如果我们这个项目对你有所帮助，请给我们一颗 ⭐️
-[![Star History Chart](https://api.star-history.com/svg?repos=lss233/chatgpt-mirai-qq-bot&type=Date)](https://star-history.com/#lss233/chatgpt-mirai-qq-bot&Date)
+如果我们这个项目对你有所帮助，请给我们一颗 ⭐️  
+
+[![Star History Chart](https://api.star-history.com/svg?repos=lss233/kirara-ai&type=Date)](https://www.star-history.com/#lss233/kirara-ai&Date)

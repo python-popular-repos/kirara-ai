@@ -2,6 +2,8 @@ import random
 from typing import Dict, List, Optional
 
 from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.events.event_bus import EventBus
+from kirara_ai.events.llm import LLMAdapterLoaded, LLMAdapterUnloaded
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.ioc.inject import Inject
 from kirara_ai.llm.adapter import LLMBackendAdapter
@@ -18,6 +20,7 @@ class LLMManager:
     config: GlobalConfig
     backend_registry: LLMBackendRegistry
     active_backends: Dict[str, List[LLMBackendAdapter]]
+    event_bus: EventBus
 
     @Inject()
     def __init__(
@@ -25,10 +28,12 @@ class LLMManager:
         container: DependencyContainer,
         config: GlobalConfig,
         backend_registry: LLMBackendRegistry,
+        event_bus: EventBus,
     ):
         self.container = container
         self.config = config
         self.backend_registry = backend_registry
+        self.event_bus = event_bus
         self.logger = get_logger("LLMAdapter")
         self.active_backends = {}
         self.backends: Dict[str, LLMBackendAdapter] = {}
@@ -38,7 +43,10 @@ class LLMManager:
         for backend in self.config.llms.api_backends:
             if backend.enable:
                 self.logger.info(f"Loading backend: {backend.name}")
-                self.load_backend(backend.name)
+                try:
+                    self.load_backend(backend.name)
+                except Exception as e:
+                    self.logger.error(f"Failed to load backend {backend.name}: {e}")
 
     def load_backend(self, backend_name: str):
         """
@@ -74,7 +82,7 @@ class LLMManager:
                 if model not in self.active_backends:
                     self.active_backends[model] = []
                 self.active_backends[model].append(adapter)
-
+        self.event_bus.post(LLMAdapterLoaded(adapter))
         self.logger.info(f"Backend {backend_name} loaded successfully")
 
     async def unload_backend(self, backend_name: str):
@@ -85,15 +93,19 @@ class LLMManager:
         backend = next(
             (b for b in self.config.llms.api_backends if b.name == backend_name), None
         )
+        backend = self.backends.get(backend_name)
         if not backend:
             raise ValueError(f"Backend {backend_name} not found in config")
 
         # 从所有模型中移除这个后端的适配器
-        for model in backend.models:
-            if model in self.active_backends:
-                self.active_backends[model] = []
-        self.backends.pop(backend_name)
-
+        all_models = list(self.active_backends.keys())
+        for model in all_models:
+            if backend in self.active_backends[model]:
+                self.active_backends[model].remove(backend)
+            if len(self.active_backends[model]) == 0:
+                self.active_backends.pop(model)
+        backend = self.backends.pop(backend_name)
+        self.event_bus.post(LLMAdapterUnloaded(backend))
     async def reload_backend(self, backend_name: str):
         """
         重新加载指定的后端

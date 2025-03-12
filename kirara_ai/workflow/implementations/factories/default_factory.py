@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from kirara_ai.workflow.core.workflow.builder import WorkflowBuilder
 from kirara_ai.workflow.implementations.blocks.im.messages import GetIMMessage, SendIMMessage
@@ -70,7 +69,7 @@ A：上班肯定累呀<break>不过，我还是很喜欢这份工作的<break>�
 # Information
 
 以下是当前的系统信息：
-当前日期时间：{datetime.now()}
+当前日期时间：{{current_date_time}}
 
 # Memories
 以下是之前发生过的对话记录。
@@ -80,7 +79,6 @@ A：上班肯定累呀<break>不过，我还是很喜欢这份工作的<break>�
 
 请注意，下面这些符号只是标记：
 1. `<break>` 用于表示聊天时发送消息的操作。
-2. `<@llm>` 开头的内容表示你当前扮演角色的回答，你的回答中不能带上这个标记。
 
 接下来，请基于以上的信息，与用户继续扮演角色。
 """.strip()

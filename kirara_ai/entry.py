@@ -1,13 +1,17 @@
-# For embedded python
 import asyncio
 import os
 import signal
+import time
+
+from packaging import version
 
 from kirara_ai.config.config_loader import ConfigLoader
 from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.events.application import ApplicationStarted, ApplicationStopping
 from kirara_ai.events.event_bus import EventBus
 from kirara_ai.im.im_registry import IMRegistry
 from kirara_ai.im.manager import IMManager
+from kirara_ai.internal import shutdown_event
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMBackendRegistry
@@ -16,6 +20,7 @@ from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomp
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.scopes import GlobalScope, GroupScope, MemberScope
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
+from kirara_ai.web.api.system.utils import get_installed_version, get_latest_pypi_version
 from kirara_ai.web.app import WebServer
 from kirara_ai.workflow.core.block import BlockRegistry
 from kirara_ai.workflow.core.dispatch import DispatchRuleRegistry, WorkflowDispatcher
@@ -25,16 +30,21 @@ from kirara_ai.workflow.implementations.workflows import register_system_workflo
 
 logger = get_logger("Entrypoint")
 
-
-# 定义优雅退出异常
-class GracefulExit(SystemExit):
-    code = 1
-
+async def check_update():
+    """检查更新"""
+    running_version = get_installed_version()
+    logger.info("Checking for updates...")
+    latest_version, _ = await get_latest_pypi_version("kirara-ai")
+    logger.info(f"Running version: {running_version}, Latest version: {latest_version}")
+    backend_update_available = version.parse(latest_version) > version.parse(running_version)
+    if backend_update_available:
+        logger.warning(f"New version {latest_version} is available. Please update to the latest version.")
+        logger.warning(f"You can download the latest version from WebUI")
 
 # 注册信号处理函数
 def _signal_handler(*args):
     logger.warning("Interrupt signal received. Stopping application...")
-    raise GracefulExit()
+    shutdown_event.set()
 
 
 def init_container() -> DependencyContainer:
@@ -63,7 +73,7 @@ def init_memory_system(container: DependencyContainer):
 def init_application() -> DependencyContainer:
     """初始化应用程序"""
     logger.info("Initializing application...")
-    
+        
     # 配置文件路径
     config_path = "./data/config.yaml"
 
@@ -83,6 +93,11 @@ def init_application() -> DependencyContainer:
             "Please create a configuration file by copying config.yaml.example to config.yaml and modify it according to your needs"
         )
         config = GlobalConfig()
+        
+    # 设置时区
+    os.environ["TZ"] = config.system.timezone
+    if hasattr(time, "tzset"):
+        time.tzset()
 
     container = init_container()
     container.register(asyncio.AbstractEventLoop, asyncio.new_event_loop())
@@ -165,6 +180,8 @@ def run_application(container: DependencyContainer):
     # 注册信号处理函数
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
+    # 阻止信号处理函数被覆盖
+    signal.signal = lambda *args: None
     
     try:
         logger.success("Kirara AI 启动完毕，等待消息中...")
@@ -172,10 +189,12 @@ def run_application(container: DependencyContainer):
             f"WebUI 管理平台本地访问地址：http://127.0.0.1:{web_server.config.web.port}/"
         )
         logger.success("Application started. Waiting for events...")
-        loop.run_forever()
-    except GracefulExit:
-        logger.info("Graceful exit requested")
+        loop.create_task(check_update())
+        event_bus = container.resolve(EventBus)
+        event_bus.post(ApplicationStarted())
+        loop.run_until_complete(shutdown_event.wait())
     finally:
+        event_bus.post(ApplicationStopping())
         # 关闭记忆系统
         memory_manager = container.resolve(MemoryManager)
         logger.info("Shutting down memory system...")
@@ -186,6 +205,7 @@ def run_application(container: DependencyContainer):
 
         # 停止Web服务器
         loop.run_until_complete(web_server.stop())
+        logger.info("Web server terminated.")
         try:
             # 停止所有 adapter
             im_manager.stop_adapters(loop=loop)
@@ -195,5 +215,6 @@ def run_application(container: DependencyContainer):
             logger.error(f"Error stopping adapters: {e}")
         
         # 关闭事件循环
-        loop.close()
+        loop.stop()
         logger.info("Application stopped gracefully")
+        logger.stop()

@@ -5,6 +5,8 @@ import sys
 from typing import Dict, List, Optional, Type
 
 from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.events.event_bus import EventBus
+from kirara_ai.events.plugin import PluginLoaded, PluginStarted, PluginStopped
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.ioc.inject import Inject
 from kirara_ai.logger import get_logger
@@ -23,6 +25,7 @@ class PluginLoader:
         self.plugin_dir = plugin_dir
         self.internal_plugins = []
         self.config = self.container.resolve(GlobalConfig)
+        self.event_bus = self.container.resolve(EventBus)
 
     def register_plugin(self, plugin_class: Type[Plugin], plugin_name: str = None):
         """注册一个插件类，主要用于测试"""
@@ -106,6 +109,7 @@ class PluginLoader:
 
     def _load_external_plugin(self, plugin_name: str):
         """加载外部插件"""
+        from importlib import reload
         from importlib.metadata import entry_points
 
         # 获取插件的 entry point
@@ -114,6 +118,15 @@ class PluginLoader:
 
         if not plugin_ep:
             raise ValueError(f"Unable to find entry point for plugin {plugin_name}")
+
+        try:
+            # 尝试重新加载 module
+            if plugin_ep.module in sys.modules:
+                module = sys.modules[plugin_ep.module]
+                self.logger.info(f"Reloading plugin {plugin_name} from {plugin_ep.module}")
+                reload(module)
+        except Exception as e:
+            self.logger.error(f"Failed to reload plugin {plugin_name}: {e}")
 
         try:
             # 加载插件类
@@ -138,8 +151,9 @@ class PluginLoader:
     def instantiate_plugin(self, plugin_class):
         """Instantiates a plugin class using dependency injection."""
         self.logger.debug(f"Instantiating plugin class: {plugin_class.__name__}")
+        event_bus = self.container.resolve(EventBus)
         with self.container.scoped() as scoped_container:
-            scoped_container.register(PluginEventBus, PluginEventBus())
+            scoped_container.register(EventBus, PluginEventBus(event_bus))
             return Inject(scoped_container).create(plugin_class)()
 
     def load_plugins(self):
@@ -149,6 +163,7 @@ class PluginLoader:
             try:
                 plugin.on_load()
                 self.logger.info(f"Plugin {plugin.__class__.__name__} initialized")
+                self.event_bus.post(PluginLoaded(plugin))
             except Exception as e:
                 self.logger.error(
                     f"Failed to initialize plugin {plugin.__class__.__name__}: {e}"
@@ -160,7 +175,9 @@ class PluginLoader:
         for plugin_name, plugin in self.plugins.items():
             try:
                 plugin.on_start()
+                self.plugin_infos[plugin_name].is_enabled = True
                 self.logger.info(f"Plugin {plugin.__class__.__name__} started")
+                self.event_bus.post(PluginStarted(plugin))
             except Exception as e:
                 self.logger.error(
                     f"Failed to start plugin {plugin.__class__.__name__}: {e}"
@@ -174,6 +191,7 @@ class PluginLoader:
                 plugin.on_stop()
                 plugin.event_bus.unregister_all()
                 self.logger.info(f"Plugin {plugin.__class__.__name__} stopped")
+                self.event_bus.post(PluginStopped(plugin))
             except Exception as e:
                 self.logger.error(
                     f"Failed to stop plugin {plugin.__class__.__name__}: {e}"
@@ -297,7 +315,7 @@ class PluginLoader:
         except Exception as e:
             plugin_info.requires_restart = True
             self.logger.error(f"Failed to enable plugin {plugin_name}: {e}")
-            return False
+            raise e
 
     async def disable_plugin(self, plugin_name: str) -> bool:
         """禁用插件"""
@@ -312,7 +330,10 @@ class PluginLoader:
             # 找到并停止插件实例
             if plugin_name in self.plugins:
                 plugin = self.plugins[plugin_name]
-                print(isinstance(plugin, Plugin))
+                
+                if isinstance(plugin.event_bus, PluginEventBus):
+                    plugin.event_bus.unregister_all()
+                    
                 plugin.on_stop()
                 del self.plugins[plugin_name]
 
@@ -420,7 +441,7 @@ class PluginLoader:
                             version=metadata["version"],
                             author=metadata["author"],
                             is_internal=False,
-                            is_enabled=ep.name in self.config.plugins.enable,
+                            is_enabled=False,
                             metadata=None,
                         )
 

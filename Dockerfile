@@ -21,6 +21,7 @@ RUN apt-get -yqq update && \
         ffmpeg \
         curl \
         jq \
+        libmagic1 \
         unzip && \
     apt-get -yq clean && \
     apt-get -yq purge --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
@@ -33,15 +34,17 @@ WORKDIR /app
 COPY --from=builder /build/dist/*.whl /app/
 
 # 下载Web UI并安装依赖
-RUN LATEST_RELEASE_URL=$(curl -s https://api.github.com/repos/DarkSkyTeam/chatgpt-for-bot-webui/releases | jq -r '.[0].assets[] | select(.name == "dist.zip") | .browser_download_url') \
-    && curl -L -o dist.zip "$LATEST_RELEASE_URL" \
-    && unzip dist.zip -d /tmp/web_dist \
-    && rm dist.zip && \
+RUN PACKAGE_INFO=$(curl -s https://registry.npmjs.org/kirara-ai-webui) && \
+    LATEST_VERSION=$(printf %s $PACKAGE_INFO | jq -r '.["dist-tags"].latest') && \
+    TARBALL_URL=$(printf %s $PACKAGE_INFO | jq -r --arg VERSION "$LATEST_VERSION" '.versions[$VERSION].dist.tarball') && \
+    curl -L -o webui.tgz "$TARBALL_URL" && \
+    mkdir -p /tmp/webui && \
+    tar -xzf webui.tgz -C /tmp/webui && \
     mkdir -p /app/web && \
-    mv /tmp/web_dist/dist/* /app/web && \
+    cp -r /tmp/webui/package/dist/* /app/web/ && \
+    rm -rf /tmp/webui webui.tgz && \
     pip install --no-cache-dir *.whl && \
     pip cache purge && \
-    python -c "from pycloudflared import try_cloudflare; try_cloudflare(-1)" || true && \
     rm *.whl
 
 # 移除不再需要的包
