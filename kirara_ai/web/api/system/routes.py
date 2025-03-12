@@ -1,3 +1,5 @@
+import asyncio
+import json
 import os
 import shutil
 import subprocess
@@ -8,16 +10,18 @@ import time
 
 import psutil
 from packaging import version
-from quart import Blueprint, current_app, g, request
+from quart import Blueprint, current_app, g, request, websocket
 
 from kirara_ai.config.config_loader import CONFIG_FILE, ConfigLoader
 from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.im.manager import IMManager
 from kirara_ai.internal import set_restart_flag, shutdown_event
 from kirara_ai.llm.llm_manager import LLMManager
+from kirara_ai.logger import WebSocketLogHandler, get_logger
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
 from kirara_ai.web.api.system.utils import (download_file, get_installed_version, get_latest_npm_version,
                                             get_latest_pypi_version)
+from kirara_ai.web.auth.services import AuthService
 from kirara_ai.workflow.core.workflow import WorkflowRegistry
 
 from ...auth.middleware import require_auth
@@ -27,6 +31,38 @@ system_bp = Blueprint("system", __name__)
 
 # 记录启动时间
 start_time = time.time()
+
+# 获取系统日志记录器
+logger = get_logger("System-API")
+
+@system_bp.websocket('/logs')
+async def logs_websocket():
+    """WebSocket端点，用于实时推送日志"""
+    try:
+        token_data = await websocket.receive()
+        
+        token = json.loads(token_data)["token"]
+    except Exception as e:
+        logger.error(f"WebSocket连接错误: {e}")
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+    auth_service: AuthService = g.container.resolve(AuthService)
+    if not auth_service.verify_token(token):
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+    try:
+
+        # 将当前WebSocket连接添加到日志处理器
+        WebSocketLogHandler.add_websocket(websocket._get_current_object(), asyncio.get_event_loop())
+        
+        # 保持连接打开，直到客户端断开
+        while True:
+            # 等待客户端消息，但我们主要是推送日志，不需要处理客户端消息
+            await websocket.receive()
+            # 如果需要，可以在这里处理客户端发送的命令
+    finally:
+        # 从日志处理器中移除当前连接
+        WebSocketLogHandler.remove_websocket(websocket._get_current_object())
 
 @system_bp.route("/config", methods=["GET"])
 @require_auth
@@ -250,6 +286,10 @@ async def perform_update():
 @require_auth
 async def restart_system():
     """重启系统"""
+    # 记录重启日志，会通过WebSocket发送给所有客户端
+    logger.warning("服务器即将重启，请稍候...")
+    
+    # 设置重启标志
     set_restart_flag()
     shutdown_event.set()
     return {"status": "success", "message": "重启请求已发送"}

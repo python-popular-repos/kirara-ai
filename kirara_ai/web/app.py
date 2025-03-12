@@ -88,6 +88,10 @@ def create_web_api_app(container: DependencyContainer) -> Quart:
     @app.before_request
     async def inject_container():
         g.container = container
+        
+    @app.before_websocket
+    async def inject_container():
+        g.container = container
 
     app.container = container
     
@@ -245,7 +249,9 @@ class WebServer:
         
         if self.server_task:
             try:
-                await self.server_task
+                await asyncio.wait_for(self.server_task, timeout=3.0)
+            except asyncio.TimeoutError:
+                logger.warning("Server shutdown timed out after 3 seconds.")
             except asyncio.CancelledError:
                 pass
             except Exception as e:
