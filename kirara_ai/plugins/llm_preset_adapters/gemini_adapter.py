@@ -33,21 +33,12 @@ def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
                 image_url = item["image_url"]["url"]
                 try:
                     if image_url.startswith("http"):
-                        from curl_cffi import requests as requests1
-                        response = requests1.get(image_url)
-                        response.raise_for_status()
-                        image_data = response.content
-                        base64_data = base64.b64encode(image_data).decode('utf-8')
+                        base64_data = msg.download_and_encode_base64(image_url)
                     else:
                         # 假设输入的是base64字符串
                         base64_data = image_url
-                        # 解码base64以检测图片格式
-                        image_data = base64.b64decode(base64_data)
-                    # 检测图片格式
-                    image_format = imghdr.what(None, image_data)
-                    if image_format is None:
-                        continue
-
+                    # 图片格式
+                    image_format = msg.get_format_from_base64(base64_data) or "jpeg"
                     parts.append({
                         "inline_data": {
                             "mime_type": f"image/{image_format}",
@@ -154,7 +145,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 api_url, headers={"x-goog-api-key": self.config.api_key}
             ) as response:
                 if response.status != 200:
-                    self.logger.error(f"获取模型列表失败: {await response.text()}")                    
+                    self.logger.error(f"获取模型列表失败: {await response.text()}")
                     response.raise_for_status()
                 response_data = await response.json()
                 return [
