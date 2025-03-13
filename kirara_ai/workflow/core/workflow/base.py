@@ -4,7 +4,7 @@ from kirara_ai.workflow.core.block import Block
 
 
 class Workflow:
-    def __init__(self, name: str, blocks: List["Block"], wires: List["Wire"], id: str):
+    def __init__(self, name: str, blocks: List["Block"], wires: List["Wire"], id: str = None):
         self.name = name
         self.blocks = blocks
         self.wires = wires
