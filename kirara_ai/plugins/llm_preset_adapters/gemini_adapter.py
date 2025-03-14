@@ -1,5 +1,8 @@
 import aiohttp
 import requests
+import base64
+import imghdr
+import io
 from pydantic import BaseModel, ConfigDict
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
@@ -16,9 +19,42 @@ class GeminiConfig(BaseModel):
 
 
 def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
+    parts = []
+
+    # 处理内容是列表的情况
+    if isinstance(msg.content, list):
+
+        for item in msg.content:
+
+            if item["type"] == "text":
+                parts.append({"text": item["text"]})
+            elif item["type"] == "image_url":
+                # 获取图片的base64编码
+                image_url = item["image_url"]["url"]
+                try:
+                    if image_url.startswith("http"):
+                        base64_data = msg.download_and_encode_base64(image_url)
+                    else:
+                        # 假设输入的是base64字符串
+                        base64_data = image_url
+                    # 图片格式
+                    image_format = msg.get_format_from_base64(base64_data) or "jpeg"
+                    parts.append({
+                        "inline_data": {
+                            "mime_type": f"image/{image_format}",
+                            "data": base64_data
+                        }
+                    })
+                except Exception as e:
+                    print(e)
+                    continue
+    else:
+        # 处理内容是字符串的情况
+        parts.append({"text": msg.content})
+
     return {
         "role": "model" if msg.role == "assistant" else "user",
-        "parts": [{"text": msg.content}],
+        "parts": parts
     }
 
 
@@ -33,7 +69,22 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-
+        safety_settings = [{
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_NONE"
+        },{
+            "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
+            "threshold": "BLOCK_NONE"
+        }]
         data = {
             "contents": [
                 convert_llm_chat_message_to_gemini_message(msg) for msg in req.messages
@@ -45,13 +96,12 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "maxOutputTokens": req.max_tokens,
                 "stopSequences": req.stop,
             },
-            "safetySettings": [],
+            "safetySettings": safety_settings,
         }
 
         self.logger.debug(f"Contents: {data['contents']}")
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
-
         response = requests.post(api_url, json=data, headers=headers)
         try:
             response.raise_for_status()
@@ -95,7 +145,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 api_url, headers={"x-goog-api-key": self.config.api_key}
             ) as response:
                 if response.status != 200:
-                    self.logger.error(f"获取模型列表失败: {await response.text()}")                    
+                    self.logger.error(f"获取模型列表失败: {await response.text()}")
                     response.raise_for_status()
                 response_data = await response.json()
                 return [

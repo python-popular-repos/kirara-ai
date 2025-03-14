@@ -1,4 +1,5 @@
 import re
+import base64
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -95,12 +96,18 @@ class ChatMessageConstructor(Block):
             "{user_name}", user_msg.sender.display_name
         )
         system_prompt_format = system_prompt_format.replace(
+            "{user_id}", user_msg.sender.user_id
+        )
+        system_prompt_format = system_prompt_format.replace(
             "{memory_content}", memory_content
         )
 
         user_prompt_format = user_prompt_format.replace("{user_msg}", user_msg.content)
         user_prompt_format = user_prompt_format.replace(
             "{user_name}", user_msg.sender.display_name
+        )
+        user_prompt_format = user_prompt_format.replace(
+            "{user_id}", user_msg.sender.user_id
         )
         user_prompt_format = user_prompt_format.replace(
             "{memory_content}", memory_content
@@ -110,9 +117,19 @@ class ChatMessageConstructor(Block):
         system_prompt = self.substitute_variables(system_prompt_format, executor)
         user_prompt = self.substitute_variables(user_prompt_format, executor)
 
+        content = user_prompt
+        if user_msg.images:
+            content = [{"type": "text", "text": system_prompt}]
+            # 添加图片内容
+            for image in user_msg.images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image.url}
+                })
+
         llm_msg = [
             LLMChatMessage(role="system", content=system_prompt),
-            LLMChatMessage(role="user", content=user_prompt),
+            LLMChatMessage(role="user", content=content),
         ]
         return {"llm_msg": llm_msg}
 

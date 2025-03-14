@@ -185,7 +185,7 @@ class ImageMessage(MediaMessage):
         return result
 
     def to_plain(self):
-        return "[ImageMessage]"
+        return f"imageUrl:{self.url}"
 
     def __repr__(self):
         return f"ImageMessage(media_id={self.media_id}, url={self.url}, path={self.path}, format={self.format})"
@@ -216,7 +216,7 @@ class MentionElement(MessageElement):
 
     def to_plain(self):
         return f"@{self.target.display_name or self.target.user_id}"
-    
+
     def __repr__(self):
         return f"MentionElement(target={self.target})"
 
