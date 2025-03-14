@@ -503,11 +503,6 @@ class MediaManager:
         if metadata.url:
             return metadata.url
         
-        # 尝试生成文件URL
-        file_path = await self.get_file_path(media_id)
-        if file_path:
-            return f"file://{file_path.absolute()}"
-        
         # 尝试生成data URL
         data = await self.get_data(media_id)
         if data and metadata.media_type and metadata.format:

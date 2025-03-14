@@ -43,7 +43,6 @@ async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_
         if isinstance(element, LLMChatTextContent):
             parts.append({"text": element.text})
         elif isinstance(element, LLMChatImageContent):
-            print(element.media_id)
             media = media_manager.get_media(element.media_id)
             parts.append({
                 "inline_data": {
