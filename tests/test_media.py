@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from kirara_ai.im.message import ImageMessage, VoiceMessage
-from kirara_ai.media import MediaManager, MediaType, get_media_manager
+from kirara_ai.media import MediaManager, MediaType
 
 
 class TestMediaManager(unittest.TestCase):
@@ -378,19 +378,6 @@ class TestMediaManager(unittest.TestCase):
             # 获取元数据
             metadata = self.media_manager.get_metadata(message.media_id)
             self.assertEqual(metadata.media_type, MediaType.VOICE)
-
-    def test_singleton(self):
-        """测试单例模式"""
-        # 重置单例
-        import kirara_ai.media.media
-        kirara_ai.media.media._media_manager = None
-        
-        # 获取单例
-        manager1 = get_media_manager()
-        manager2 = get_media_manager()
-        
-        # 验证是同一个实例
-        self.assertIs(manager1, manager2)
-    
+            
 if __name__ == "__main__":
     unittest.main() 

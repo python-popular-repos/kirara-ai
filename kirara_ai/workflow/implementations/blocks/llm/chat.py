@@ -1,11 +1,11 @@
 import re
-import base64
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional
 
 from kirara_ai.im.message import IMMessage, TextMessage
 from kirara_ai.ioc.container import DependencyContainer
-from kirara_ai.llm.format.message import LLMChatMessage
+from kirara_ai.llm.format import LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatImageContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.llm.llm_manager import LLMManager
@@ -117,18 +117,13 @@ class ChatMessageConstructor(Block):
         system_prompt = self.substitute_variables(system_prompt_format, executor)
         user_prompt = self.substitute_variables(user_prompt_format, executor)
 
-        content = user_prompt
-        if user_msg.images:
-            content = [{"type": "text", "text": system_prompt}]
-            # 添加图片内容
-            for image in user_msg.images:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": image.url}
-                })
+        content = [LLMChatTextContent(text=user_prompt)]
+        # 添加图片内容
+        for image in user_msg.images or []:
+            content.append(LLMChatImageContent(media_id=image.media_id))
 
         llm_msg = [
-            LLMChatMessage(role="system", content=system_prompt),
+            LLMChatMessage(role="system", content=[LLMChatTextContent(text=system_prompt)]),
             LLMChatMessage(role="user", content=content),
         ]
         return {"llm_msg": llm_msg}

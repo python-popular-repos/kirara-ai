@@ -1,9 +1,13 @@
-from kirara_ai.media.media import MediaManager, MediaMetadata, MediaType, detect_mime_type, get_media_manager
+from kirara_ai.media.manager import MediaManager
+from kirara_ai.media.media_object import Media
+from kirara_ai.media.metadata import MediaMetadata
+from kirara_ai.media.types import MediaType
+from kirara_ai.media.utils import detect_mime_type
 
 __all__ = [
-    "MediaType",
-    "MediaMetadata",
+    "Media",
     "MediaManager",
-    "get_media_manager",
-    "detect_mime_type"
+    "MediaMetadata",
+    "MediaType",
+    "detect_mime_type",
 ]

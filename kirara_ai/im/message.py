@@ -3,8 +3,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from kirara_ai.im.sender import ChatSender
-from kirara_ai.media import MediaManager, get_media_manager
+from kirara_ai.media import MediaManager, MediaType
 
+MIMETYPE_MAPPING = {
+    "image": MediaType.IMAGE,
+    "audio": MediaType.AUDIO,
+    "video": MediaType.VIDEO,
+    "file": MediaType.FILE,
+}
 
 # 定义消息元素的基类
 class MessageElement(ABC):
@@ -53,12 +59,11 @@ class MediaMessage(MessageElement):
         self.data = data
         self.format = format
         self.media_id = media_id
-        self.resource_type = "media"  # 由子类重写为具体类型
         self._reference_id = reference_id or f"im_message_{id(self)}"
         self._source = source
         self._description = description
         self._tags = tags or []
-        self._media_manager = media_manager
+        self._media_manager = media_manager or MediaManager()
 
         # 如果已经有media_id，则直接使用
         if media_id:
@@ -69,7 +74,7 @@ class MediaMessage(MessageElement):
 
     def _register_media(self) -> None:
         """注册媒体文件"""
-        media_manager = self._media_manager or get_media_manager()
+        media_manager = self._media_manager
         
         # 根据传入的参数注册媒体文件
         self.media_id = media_manager.register_media(
@@ -80,6 +85,7 @@ class MediaMessage(MessageElement):
             source=self._source,
             description=self._description,
             tags=self._tags,
+            media_type=MIMETYPE_MAPPING[self.resource_type],
             reference_id=self._reference_id
         )
         
@@ -100,7 +106,7 @@ class MediaMessage(MessageElement):
             return self.url
             
         # 否则从媒体管理器获取
-        media_manager = self._media_manager or get_media_manager()
+        media_manager = self._media_manager
         url = await media_manager.get_url(self.media_id)
         if url:
             self.url = url  # 缓存结果
@@ -118,7 +124,7 @@ class MediaMessage(MessageElement):
             return self.path
             
         # 否则从媒体管理器获取
-        media_manager = self._media_manager or get_media_manager()
+        media_manager = self._media_manager
         file_path = await media_manager.get_file_path(self.media_id)
         if file_path:
             self.path = str(file_path)  # 缓存结果
@@ -136,13 +142,20 @@ class MediaMessage(MessageElement):
             return self.data
             
         # 否则从媒体管理器获取
-        media_manager = self._media_manager or get_media_manager()
+        media_manager = self._media_manager
         data = await media_manager.get_data(self.media_id)
         if data:
             self.data = data  # 缓存结果
             return data
             
         raise ValueError("Failed to get media data")
+    
+    def get_description(self) -> str:
+        """获取媒体资源的描述"""
+        metadata = self._media_manager.get_metadata(self.media_id)
+        if metadata:
+            return metadata.description
+        return ""
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -185,7 +198,7 @@ class ImageMessage(MediaMessage):
         return result
 
     def to_plain(self):
-        return f"imageUrl:{self.url}"
+        return f"[ImageMessage:url={self.url},alt={self.get_description()}]"
 
     def __repr__(self):
         return f"ImageMessage(media_id={self.media_id}, url={self.url}, path={self.path}, format={self.format})"
@@ -238,7 +251,7 @@ class ReplyElement(MessageElement):
 
 
 # 定义文件消息元素
-class FileElement(MediaMessage):
+class FileMessage(MediaMessage):
     resource_type = "file"
     
     def to_dict(self):
@@ -254,7 +267,7 @@ class FileElement(MediaMessage):
 
 
 # 定义JSON消息元素
-class JsonElement(MessageElement):
+class JsonMessage(MessageElement):
 
     def __init__(self, data: str):
         self.data = data
@@ -263,14 +276,14 @@ class JsonElement(MessageElement):
         return {"type": "json", "data": {"data": self.data}}
 
     def to_plain(self):
-        return "[JSON Message]"
+        return f"[JSON:{self.data}]"
 
     def __repr__(self):
-        return f"JsonElement(data={self.data})"
+        return f"JsonMessage(data={self.data})"
 
 
 # 定义表情消息元素
-class FaceElement(MessageElement):
+class EmojiMessage(MessageElement):
 
     def __init__(self, face_id: str):
         self.face_id = face_id
@@ -283,11 +296,11 @@ class FaceElement(MessageElement):
         return f"[Face:{self.face_id}]"
 
     def __repr__(self):
-        return f"FaceElement(face_id={self.face_id})"
+        return f"EmojiMessage(face_id={self.face_id})"
 
 
 # 定义视频消息元素
-class VideoElement(MediaMessage):
+class VideoMessage(MediaMessage):
     resource_type = "video"
     
     def to_dict(self):
@@ -296,10 +309,10 @@ class VideoElement(MediaMessage):
         return result
 
     def to_plain(self):
-        return "[Video Message]"
+        return f"[Video:{self.path or self.url or 'unnamed'}]"
 
     def __repr__(self):
-        return f"VideoElement(media_id={self.media_id}, url={self.url}, path={self.path}, format={self.format})"
+        return f"VideoMessage(media_id={self.media_id}, url={self.url}, path={self.path}, format={self.format})"
 
 
 # 定义消息类
@@ -373,6 +386,16 @@ class IMMessage:
             ),
             "raw_message": self.raw_message,
         }
+
+
+# backward compatibility
+# deprecated
+FileElement = FileMessage
+ImageElement = ImageMessage
+VoiceElement = VoiceMessage
+VideoElement = VideoMessage
+EmojiElement = EmojiMessage
+JsonElement = JsonMessage
 
 # 示例用法
 if __name__ == "__main__":

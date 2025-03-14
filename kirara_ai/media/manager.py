@@ -3,144 +3,19 @@ import base64
 import json
 import shutil
 import uuid
-from datetime import datetime
-from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import aiofiles
-import aiohttp
-import magic
+
+from kirara_ai.logger import get_logger
+from kirara_ai.media.metadata import MediaMetadata
+from kirara_ai.media.types.media_type import MediaType
+from kirara_ai.media.utils.mime import detect_mime_type
 
 if TYPE_CHECKING:
     from kirara_ai.im.message import MediaMessage
-
-from kirara_ai.logger import get_logger
-
-
-class MediaType(Enum):
-    """媒体类型枚举"""
-    IMAGE = "image"
-    VOICE = "audio"
-    VIDEO = "video"
-    FILE = "file"
-    
-    @classmethod
-    def from_mime(cls, mime_type: str) -> 'MediaType':
-        """从MIME类型获取媒体类型"""
-        main_type = mime_type.split('/')[0]
-        if main_type == "image":
-            return cls.IMAGE
-        elif main_type == "audio":
-            return cls.VOICE
-        elif main_type == "video":
-            return cls.VIDEO
-        else:
-            return cls.FILE
-
-
-mime_remapping = {
-    "audio/mpeg": "audio/mp3",
-    "audio/x-wav": "audio/wav",
-    "audio/x-m4a": "audio/m4a",
-    "audio/x-flac": "audio/flac",
-}
-def detect_mime_type(data: bytes = None, path: str = None) -> Tuple[str, MediaType, str]:
-    """
-    检测文件的MIME类型
-    
-    Args:
-        data: 文件数据
-        path: 文件路径
-        
-    Returns:
-        Tuple[str, MediaType, str]: (mime_type, media_type, format)
-    """
-    if data is not None:
-        mime_type = magic.from_buffer(data, mime=True)
-    elif path is not None:
-        mime_type = magic.from_file(path, mime=True)
-    else:
-        raise ValueError("Must provide either data or path")
-    if mime_type in mime_remapping:
-        mime_type = mime_remapping[mime_type]
-        
-    media_type = MediaType.from_mime(mime_type)
-    format = mime_type.split('/')[-1]
-    
-    return mime_type, media_type, format
-
-
-class MediaMetadata:
-    """媒体元数据类"""
-    
-    def __init__(
-        self,
-        media_id: str,
-        media_type: Optional[MediaType] = None,
-        format: Optional[str] = None,
-        size: Optional[int] = None,
-        created_at: Optional[datetime] = None,
-        source: Optional[str] = None,
-        description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        references: Optional[Set[str]] = None,
-        url: Optional[str] = None,
-        path: Optional[str] = None
-    ):
-        self.media_id = media_id
-        self.media_type = media_type
-        self.format = format
-        self.size = size
-        self.created_at = created_at or datetime.now()
-        self.source = source
-        self.description = description
-        self.tags = tags or []
-        self.references = references or set()
-        self.url = url
-        self.path = path
-        
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        result = {
-            "media_id": self.media_id,
-            "created_at": self.created_at.isoformat(),
-            "source": self.source,
-            "description": self.description,
-            "tags": self.tags,
-            "references": list(self.references),
-        }
-        
-        # 添加可选字段
-        if self.media_type:
-            result["media_type"] = self.media_type.value
-        if self.format:
-            result["format"] = self.format
-        if self.size is not None:
-            result["size"] = self.size
-        if self.url:
-            result["url"] = self.url
-        if self.path:
-            result["path"] = self.path
-            
-        return result
-        
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MediaMetadata':
-        """从字典创建元数据"""
-        return cls(
-            media_id=data["media_id"],
-            media_type=MediaType(data["media_type"]) if "media_type" in data else None,
-            format=data.get("format"),
-            size=data.get("size"),
-            created_at=datetime.fromisoformat(data["created_at"]),
-            source=data.get("source"),
-            description=data.get("description"),
-            tags=data.get("tags", []),
-            references=set(data.get("references", [])),
-            url=data.get("url"),
-            path=data.get("path")
-        )
+    from kirara_ai.media.media_object import Media
 
 
 class MediaManager:
@@ -198,15 +73,17 @@ class MediaManager:
     
     async def _download_file_async(self, url: str) -> bytes:
         """异步下载文件"""
+        from curl_cffi import AsyncSession, Response
+
         # 如果 url 是 file:// 开头，则直接返回文件内容
         if url.startswith("file://"):
             async with aiofiles.open(url[7:], "rb") as f:
                 return await f.read()
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    raise ValueError(f"Failed to download file from {url}, status: {resp.status}")
-                return await resp.read()
+        async with AsyncSession() as session:
+            resp: Response = await session.get(url)
+            if resp.status_code != 200:
+                raise ValueError(f"Failed to download file from {url}, status: {resp.status}")
+            return resp.content
     
     def register_media(
         self,
@@ -274,7 +151,7 @@ class MediaManager:
             media_type=media_type,
             format=format,
             size=size,
-            created_at=datetime.now(),
+            created_at=None,  # 使用默认值
             source=source,
             description=description,
             tags=tags,
@@ -284,7 +161,9 @@ class MediaManager:
         )
         
         # 保存元数据
+        print(media_id)
         self._save_metadata(metadata)
+        print(self.metadata_cache)
         
         # 如果提供了path，在后台复制文件
         if path and format:
@@ -715,13 +594,16 @@ class MediaManager:
         else:
             return FileElement(media_id=media_id)
 
-
-# 单例模式
-_media_manager: Optional[MediaManager] = None
-
-def get_media_manager() -> MediaManager:
-    """获取媒体管理器单例"""
-    global _media_manager
-    if _media_manager is None:
-        _media_manager = MediaManager()
-    return _media_manager
+    def get_media(self, media_id: str) -> Optional["Media"]:
+        """获取媒体对象"""
+        print(media_id)
+        print(self.metadata_cache)
+        if media_id not in self.metadata_cache:
+            return None
+        from kirara_ai.media.media_object import Media
+        return Media(media_id=media_id, media_manager=self)
+    
+    def __new__(cls, *args, **kwargs) -> "MediaManager":
+        if not hasattr(cls, "_instance"):
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance

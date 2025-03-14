@@ -1,16 +1,35 @@
+import asyncio
+
 import aiohttp
 import requests
-import base64
-import imghdr
-import io
 from pydantic import BaseModel, ConfigDict
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatMessage
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.logger import get_logger
+from kirara_ai.media import MediaManager
 
+SAFETY_SETTINGS = [{
+    "category": "HARM_CATEGORY_HARASSMENT",
+    "threshold": "BLOCK_NONE"
+},{
+    "category": "HARM_CATEGORY_HATE_SPEECH",
+    "threshold": "BLOCK_NONE"
+},{
+    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    "threshold": "BLOCK_NONE"
+},{
+    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+    "threshold": "BLOCK_NONE"
+},{
+    "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
+    "threshold": "BLOCK_NONE"
+}]
+
+# POST 模式支持最大 20 MB 的 inline data
+INLINE_LIMIT_SIZE = 1024 * 1024 * 20
 
 class GeminiConfig(BaseModel):
     api_key: str
@@ -18,39 +37,20 @@ class GeminiConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
+async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_manager: MediaManager) -> dict:
     parts = []
-
-    # 处理内容是列表的情况
-    if isinstance(msg.content, list):
-
-        for item in msg.content:
-
-            if item["type"] == "text":
-                parts.append({"text": item["text"]})
-            elif item["type"] == "image_url":
-                # 获取图片的base64编码
-                image_url = item["image_url"]["url"]
-                try:
-                    if image_url.startswith("http"):
-                        base64_data = msg.download_and_encode_base64(image_url)
-                    else:
-                        # 假设输入的是base64字符串
-                        base64_data = image_url
-                    # 图片格式
-                    image_format = msg.get_format_from_base64(base64_data) or "jpeg"
-                    parts.append({
-                        "inline_data": {
-                            "mime_type": f"image/{image_format}",
-                            "data": base64_data
-                        }
-                    })
-                except Exception as e:
-                    print(e)
-                    continue
-    else:
-        # 处理内容是字符串的情况
-        parts.append({"text": msg.content})
+    for element in msg.content:
+        if isinstance(element, LLMChatTextContent):
+            parts.append({"text": element.text})
+        elif isinstance(element, LLMChatImageContent):
+            print(element.media_id)
+            media = media_manager.get_media(element.media_id)
+            parts.append({
+                "inline_data": {
+                    "mime_type": media.mime_type,
+                    "data": await media.get_base64()
+                }
+            })
 
     return {
         "role": "model" if msg.role == "assistant" else "user",
@@ -59,6 +59,9 @@ def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage) -> dict:
 
 
 class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
+    
+    media_manager: MediaManager
+    
     def __init__(self, config: GeminiConfig):
         self.config = config
         self.logger = get_logger("GeminiAdapter")
@@ -69,26 +72,19 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-        safety_settings = [{
-            "category": "HARM_CATEGORY_HARASSMENT",
-            "threshold": "BLOCK_NONE"
-        },{
-            "category": "HARM_CATEGORY_HATE_SPEECH",
-            "threshold": "BLOCK_NONE"
-        },{
-            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            "threshold": "BLOCK_NONE"
-        },{
-            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-            "threshold": "BLOCK_NONE"
-        },{
-            "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
-            "threshold": "BLOCK_NONE"
-        }]
+        
+        # create a new asyncio loop to run the convert_llm_chat_message_to_gemini_message function
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        # use asyncio gather to run the convert_llm_chat_message_to_gemini_message function
+        contents = loop.run_until_complete(
+            asyncio.gather(
+                *[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages]
+            )
+        )
+
         data = {
-            "contents": [
-                convert_llm_chat_message_to_gemini_message(msg) for msg in req.messages
-            ],
+            "contents": contents ,
             "generationConfig": {
                 "temperature": req.temperature,
                 "topP": req.top_p,
@@ -96,7 +92,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "maxOutputTokens": req.max_tokens,
                 "stopSequences": req.stop,
             },
-            "safetySettings": safety_settings,
+            "safetySettings": SAFETY_SETTINGS,
         }
 
         self.logger.debug(f"Contents: {data['contents']}")
