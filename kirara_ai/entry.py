@@ -231,4 +231,4 @@ def run_application(container: DependencyContainer):
         # 关闭事件循环
         loop.stop()
         logger.info("Application stopped gracefully")
-        logger.stop()
+        logger.remove()
