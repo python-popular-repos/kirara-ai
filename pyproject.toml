@@ -44,6 +44,7 @@ dependencies = [
     "python-magic ; platform_system != 'Windows'",
     "python-magic-bin ; platform_system == 'Windows'",
     "ymbotpy",
+    "Pillow",
 ]
 
 

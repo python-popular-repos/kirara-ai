@@ -82,7 +82,7 @@ class MediaManager:
         async with AsyncSession() as session:
             resp: Response = await session.get(url)
             if resp.status_code != 200:
-                raise ValueError(f"Failed to download file from {url}, status: {resp.status}")
+                raise ValueError(f"Failed to download file from {url}, status: {resp.status_code}")
             return resp.content
     
     def register_media(
@@ -161,9 +161,7 @@ class MediaManager:
         )
         
         # 保存元数据
-        print(media_id)
         self._save_metadata(metadata)
-        print(self.metadata_cache)
         
         # 如果提供了path，在后台复制文件
         if path and format:
@@ -200,6 +198,25 @@ class MediaManager:
                         f.write(data)
                 else:
                     self.logger.error(f"Failed to save file: {e}")
+                    
+        # 如果提供了 url，在后台保存文件
+        elif url:
+            target_path = self._get_file_path(media_id, format)
+            
+            async def save_file():
+                data = await self._download_file_async(url)
+                metadata.size = len(data)
+                self._save_metadata(metadata)
+                await self._save_file_async(data, target_path)
+            
+            # 创建后台任务
+            try:
+                loop = asyncio.get_event_loop()
+                self._create_task(save_file(), f"save_file_{media_id}")
+            except Exception as e:
+                if "There is no current event loop" in str(e):
+                    with open(target_path, "wb") as f:
+                        f.write(data)
         
         return media_id
     
@@ -282,9 +299,9 @@ class MediaManager:
             
             # 如果没有引用了，删除文件
             if not metadata.references:
-                self._delete_media(media_id)
+                self.delete_media(media_id)
     
-    def _delete_media(self, media_id: str) -> None:
+    def delete_media(self, media_id: str) -> None:
         """删除媒体文件和元数据"""
         if media_id not in self.metadata_cache:
             return
@@ -376,29 +393,9 @@ class MediaManager:
         
         # 如果没有格式信息，无法确定文件路径
         if not metadata.format:
-            # 如果有URL，尝试下载并检测格式
-            if metadata.url:
-                try:
-                    data = await self._download_file_async(metadata.url)
-                    _, media_type, format = detect_mime_type(data=data)
-                    
-                    # 更新元数据
-                    metadata.media_type = media_type
-                    metadata.format = format
-                    metadata.size = len(data)
-                    self._save_metadata(metadata)
-                    
-                    # 保存文件
-                    target_path = self._get_file_path(media_id, format)
-                    await self._save_file_async(data, target_path)
-                    
-                    return target_path
-                except Exception as e:
-                    self.logger.error(f"Failed to download media from URL: {metadata.url}, error: {e}")
-                    return None
             
             # 如果有path，尝试复制并检测格式
-            elif metadata.path:
+            if metadata.path:
                 try:
                     file_path = Path(metadata.path)
                     if not file_path.exists():
@@ -420,7 +417,27 @@ class MediaManager:
                 except Exception as e:
                     self.logger.error(f"Failed to copy media from path: {metadata.path}, error: {e}")
                     return None
-            
+                        # 如果有URL，尝试下载并检测格式
+            elif metadata.url:
+                try:
+                    data = await self._download_file_async(metadata.url)
+                    _, media_type, format = detect_mime_type(data=data)
+                    
+                    # 更新元数据
+                    metadata.media_type = media_type
+                    metadata.format = format
+                    metadata.size = len(data)
+                    self._save_metadata(metadata)
+                    
+                    # 保存文件
+                    target_path = self._get_file_path(media_id, format)
+                    await self._save_file_async(data, target_path)
+                    
+                    return target_path
+                except Exception as e:
+                    self.logger.error(f"Failed to download media from URL: {metadata.url}, error: {e}")
+                    return None
+                
             return None
         
         # 检查文件是否存在
@@ -566,7 +583,7 @@ class MediaManager:
         count = 0
         for media_id, metadata in list(self.metadata_cache.items()):
             if not metadata.references:
-                self._delete_media(media_id)
+                self.delete_media(media_id)
                 count += 1
         
         return count
@@ -591,8 +608,6 @@ class MediaManager:
 
     def get_media(self, media_id: str) -> Optional["Media"]:
         """获取媒体对象"""
-        print(media_id)
-        print(self.metadata_cache)
         if media_id not in self.metadata_cache:
             return None
         from kirara_ai.media.media_object import Media
@@ -600,5 +615,6 @@ class MediaManager:
     
     def __new__(cls, *args, **kwargs) -> "MediaManager":
         if not hasattr(cls, "_instance"):
+            print("new MediaManager")
             cls._instance = super().__new__(cls, *args, **kwargs)
         return cls._instance
