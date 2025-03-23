@@ -1,4 +1,5 @@
 import asyncio
+import base64
 
 import aiohttp
 import requests
@@ -7,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 
@@ -30,6 +31,10 @@ SAFETY_SETTINGS = [{
 
 # POST 模式支持最大 20 MB 的 inline data
 INLINE_LIMIT_SIZE = 1024 * 1024 * 20
+
+IMAGE_MODAL_MODELS = [
+    "gemini-2.0-flash-exp"
+]
 
 class GeminiConfig(BaseModel):
     api_key: str
@@ -90,9 +95,13 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "topK": 40,
                 "maxOutputTokens": req.max_tokens,
                 "stopSequences": req.stop,
+                "responseModalities": ["text"],
             },
             "safetySettings": SAFETY_SETTINGS,
         }
+        
+        if req.model in IMAGE_MODAL_MODELS:
+            data["generationConfig"]["responseModalities"] = ["text", "image"]
 
         self.logger.debug(f"Contents: {data['contents']}")
         # Remove None fields
@@ -104,34 +113,30 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         except Exception as e:
             print(f"API Response: {response.text}")
             raise e
-        print(response_data)
-
-        # Transform Gemini response format to match expected LLMChatResponse format
-        transformed_response = {
-            "id": response_data.get("promptFeedback", {}).get("blockReason", ""),
-            "object": "chat.completion",
-            "created": 0,  # Gemini doesn't provide creation timestamp
-            "model": req.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_data["candidates"][0]["content"]["parts"][
-                            0
-                        ]["text"],
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 0,  # Gemini doesn't provide token counts
-                "completion_tokens": 0,
-                "total_tokens": 0,
-            },
-        }
-
-        return LLMChatResponse(**transformed_response)
+        self.logger.debug(f"API Response: {response_data}")
+        content = []
+        for part in response_data["candidates"][0]["content"]["parts"]:
+            if "text" in part:
+                content.append(LLMChatTextContent(text=part["text"]))
+            elif "inlineData" in part :
+                data = base64.b64decode(part["inlineData"]["data"])
+                media = self.media_manager.register_from_data(data=data, format=part["inlineData"]["mimeType"].removeprefix("image/"), source="gemini response")
+                content.append(LLMChatImageContent(media_id=media))
+                
+        return LLMChatResponse(
+            model=req.model,
+            usage=Usage(
+                prompt_tokens=response_data["usageMetadata"].get("promptTokenCount"),
+                cached_tokens=response_data["usageMetadata"].get("cachedContentTokenCount"),
+                completion_tokens=sum([modality.get("tokenCount", 0) for modality in response_data.get("promptTokensDetails", [])]),
+                total_tokens=response_data["usageMetadata"].get("totalTokenCount"),
+            ),
+            message=Message(
+                content=content,
+                role="assistant",
+                finish_reason=response_data["candidates"][0].get("finishReason"),
+            ),
+        )
 
     async def auto_detect_models(self) -> list[str]:
         api_url = f"{self.config.api_base}/models"

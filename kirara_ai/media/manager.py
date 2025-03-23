@@ -193,7 +193,7 @@ class MediaManager:
                 loop = asyncio.get_event_loop()
                 self._create_task(save_file(), f"save_file_{media_id}")
             except Exception as e:
-                if "There is no current event loop" in str(e):
+                if "no running event loop" in str(e):
                     with open(target_path, "wb") as f:
                         f.write(data)
                 else:
@@ -213,8 +213,9 @@ class MediaManager:
             try:
                 loop = asyncio.get_event_loop()
                 self._create_task(save_file(), f"save_file_{media_id}")
+                loop.run_until_complete(save_file())
             except Exception as e:
-                if "There is no current event loop" in str(e):
+                if "no running event loop" in str(e):
                     with open(target_path, "wb") as f:
                         f.write(data)
         

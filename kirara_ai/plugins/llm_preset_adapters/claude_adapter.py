@@ -1,11 +1,16 @@
+import asyncio
+import base64
+
 import aiohttp
 import requests
 from pydantic import BaseModel, ConfigDict
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
+from kirara_ai.media.manager import MediaManager
 
 
 class ClaudeConfig(BaseModel):
@@ -13,24 +18,25 @@ class ClaudeConfig(BaseModel):
     api_base: str = "https://api.anthropic.com/v1"
     model_config = ConfigDict(frozen=True)
 
-
-def convert_messages_to_claude_prompt(messages) -> str:
-    """将消息列表转换为 Claude 的对话格式"""
-    prompt = ""
-    for msg in messages:
-        if msg.role == "system":
-            # Claude 没有专门的系统消息，我们将其作为 Human 的第一条消息
-            prompt += f"Human: {msg.content}\n\nAssistant: I understand. I'll follow these instructions.\n\n"
-        elif msg.role == "user":
-            prompt += f"Human: {msg.content}\n\n"
-        elif msg.role == "assistant":
-            prompt += f"Assistant: {msg.content}\n\n"
-    # 添加最后的 Assistant: 前缀来获取回复
-    prompt += "Assistant: "
-    return prompt
-
-
+async def convert_llm_chat_message_to_claude_message(messages: list[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
+    content = []
+    for msg in [msg for msg in messages if msg.role in ["user", "assistant"]]:
+        parts = []
+        for part in msg.content:
+            if isinstance(part, LLMChatTextContent):
+                parts.append({"text": part.text, "type": "text"})
+            elif isinstance(part, LLMChatImageContent):
+                media = media_manager.get_media(part.media_id)
+                parts.append({"source": {"media_type": media.mime_type, "data": await media.get_base64()}, "type": "image"})
+        content.append({
+            "role": msg.role,
+            "content": parts
+        })
+    return content
 class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
+    
+    media_manager: MediaManager
+    
     def __init__(self, config: ClaudeConfig):
         self.config = config
         self.logger = get_logger("ClaudeAdapter")
@@ -42,32 +48,30 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
+        
+        # Claude 的系统消息比较特殊
+        system_messages = [msg for msg in req.messages if msg.role == "system"]
+        if system_messages:
+            system_message = system_messages[0].content
+        else:
+            system_message = None
 
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         # 构建请求数据
         data = {
             "model": req.model,
             "messages": [
-                {
-                    "role": "user" if msg.role == "user" else "assistant",
-                    "content": msg.content,
-                }
-                for msg in req.messages
-                if msg.role
-                in ["user", "assistant"]  # 跳过 system 消息，因为 Claude API 不支持
+                loop.run_until_complete(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager))
             ],
             "max_tokens": req.max_tokens,
+            "system": system_message,
             "temperature": req.temperature,
             "top_p": req.top_p,
             "stream": req.stream,
         }
 
-        # 如果有系统消息，将其添加到第一个用户消息前面
-        system_messages = [msg for msg in req.messages if msg.role == "system"]
-        if system_messages:
-            if len(data["messages"]) > 0 and data["messages"][0]["role"] == "user":
-                data["messages"][0][
-                    "content"
-                ] = f"{system_messages[0].content}\n\n{data['messages'][0]['content']}"
+
 
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
@@ -79,31 +83,30 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         except Exception as e:
             self.logger.error(f"API Response: {response.text}")
             raise e
+        
+        content = []
+        
+        for res in response_data["content"]:
+            if res["type"] == "text":
+                content.append(LLMChatTextContent(text=res["text"]))
+            elif res["type"] == "image":
+                data = base64.b64decode(res["source"]["data"])
+                media = self.media_manager.register_from_data(data, res["source"]["mime_type"], source="claude response")
+                content.append(LLMChatImageContent(media_id=media))
 
-        # 转换 Claude 响应格式为标准的 LLMChatResponse 格式
-        transformed_response = {
-            "id": response_data.get("id", ""),
-            "object": "chat.completion",
-            "created": response_data.get("created_at", 0),
-            "model": req.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_data["content"][0]["text"],
-                    },
-                    "finish_reason": response_data.get("stop_reason", "stop"),
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 0,  # Claude API 目前不返回 token 使用量
-                "completion_tokens": 0,
-                "total_tokens": 0,
-            },
-        }
-
-        return LLMChatResponse(**transformed_response)
+        return LLMChatResponse(
+            model=req.model,
+            usage=Usage(
+                prompt_tokens=response_data["usage"]["input_tokens"],
+                completion_tokens=response_data["usage"]["output_tokens"],
+                total_tokens=response_data["usage"]["input_tokens"] + response_data["usage"]["output_tokens"],
+            ),
+            message=Message(
+                content=content,
+                role=response_data.get("role"),
+                finish_reason=response_data.get("stop_reason", "stop"),
+            ),
+        )
 
     async def auto_detect_models(self) -> list[str]:
         # {

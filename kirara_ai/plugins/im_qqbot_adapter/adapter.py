@@ -179,13 +179,12 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
                 elif isinstance(element, VideoElement):
                     file_type = 2
                 media = await upload_func(file_type=file_type, file_data=await element.get_data())
-                print(media)
                 await post_message_func(media=media, msg_seq=msg_seq, msg_type=7)
                 msg_seq += 1
 
         # 发送循环结束后可能剩余的文本
         if current_text:
-            await post_message_func(content=current_text)
+            await post_message_func(content=current_text, msg_seq=msg_seq)
 
     async def on_c2c_message_create(self, message: ymbotpy.message.C2CMessage):
         """

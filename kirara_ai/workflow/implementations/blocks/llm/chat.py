@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional
 
-from kirara_ai.im.message import IMMessage, TextMessage
+from kirara_ai.im.message import ImageMessage, IMMessage, TextMessage
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.format import LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.message import LLMChatImageContent
@@ -166,14 +166,15 @@ class ChatResponseConverter(Block):
     container: DependencyContainer
 
     def execute(self, resp: LLMChatResponse) -> Dict[str, Any]:
-        content = ""
-        if resp.choices and resp.choices[0].message:
-            content = resp.choices[0].message.content
-
-        # 通过 <break> 将回答分为不同的 TextMessage
         message_elements = []
-        for element in content.split("<break>"):
-            if element.strip():
-                message_elements.append(TextMessage(element.strip()))
+        
+        for part in resp.message.content:
+            if isinstance(part, LLMChatTextContent):
+                # 通过 <break> 将回答分为不同的 TextMessage
+                for element in part.text.split("<break>"):
+                    if element.strip():
+                        message_elements.append(TextMessage(element.strip()))
+            elif isinstance(part, LLMChatImageContent):
+                message_elements.append(ImageMessage(media_id=part.media_id))
         msg = IMMessage(sender="<@llm>", message_elements=message_elements)
         return {"msg": msg}

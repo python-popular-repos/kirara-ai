@@ -2,10 +2,9 @@ import re
 from datetime import datetime, timedelta
 from typing import List, Union
 
-from kirara_ai.im.message import IMMessage, MediaMessage
+from kirara_ai.im.message import IMMessage, MediaMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
-from kirara_ai.llm.format.response import Message
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.memory.entry import MemoryEntry
@@ -24,11 +23,20 @@ class DefaultMemoryComposer(MemoryComposer):
                 for element in msg.message_elements:
                     if isinstance(element, MediaMessage):
                         desc = element.get_description()
-                        composed_message += f"<media_msg id={element.media_id} description=\"{desc}\" />\n"
+                        composed_message += f"<media_msg id={element.media_id} desc=\"{desc}\" />\n"
+                    elif isinstance(element, TextMessage):
+                        composed_message += f"{element.to_plain()}\n"
                     else:
-                        composed_message += f"{element.to_plain()}"
-            elif isinstance(msg, LLMChatMessage) or isinstance(msg, Message):
-                composed_message += f"你回答: {msg.content}\n"
+                        composed_message += element.to_plain()
+            elif isinstance(msg, LLMChatMessage):
+                composed_message += f"你回答: \n"
+                for part in msg.content:
+                    if isinstance(part, LLMChatTextContent):
+                        composed_message += f"{part.text}\n"
+                    elif isinstance(part, LLMChatImageContent):
+                        media = self.container.resolve(MediaManager).get_media(part.media_id)
+                        desc = media.description
+                        composed_message += f"<media_msg id={part.media_id} desc=\"{desc}\" />\n"
 
         composed_message = composed_message.strip()
         composed_at = datetime.now()
@@ -96,27 +104,24 @@ class MultiElementDecomposer(MemoryDecomposer):
     def create_llm_chat_message(self, content: str, role: str, sender: ChatSender) -> Union[LLMChatMessage, None]:
         message_content: List[Union[LLMChatTextContent, LLMChatImageContent]] = []
 
-        if isinstance(sender, ChatSender) and role == "user":
-            message_content.append(LLMChatTextContent(text=f"{sender.display_name} 说: \n"))
-
         # 使用正则表达式提取 <media_msg> 标签
-        media_msg_pattern = re.compile(r'<media_msg id=(.*?) description="(.*?)" />')
+        media_msg_pattern = re.compile(r'<media_msg id=(.*?) desc="(.*?)" />')
         matches = media_msg_pattern.findall(content)
 
         last_index = 0
         for media_id, description in matches:
-            start_index = content.find(f'<media_msg id={media_id} description="{description}" />', last_index)
+            start_index = content.find(f'<media_msg id={media_id} desc="{description}" />', last_index)
             if start_index > last_index:
                 text_content = content[last_index:start_index]
                 message_content.append(LLMChatTextContent(text=text_content))
             # 校验媒体资源有效性
             media_object = self.container.resolve(MediaManager).get_media(media_id)
             if media_object:
-                message_content.append(LLMChatImageContent(media_object=media_object))
+                message_content.append(LLMChatImageContent(media_id=media_id))
             else:
                 self.logger.warning(f"媒体资源无效: {media_id}")
-                message_content.append(LLMChatTextContent(text=f"<media_msg id={media_id} description=\"{description}\" status=\"error: 媒体资源无效\"/> "))
-            last_index = start_index + len(f'<media_msg id={media_id} description="{description}" />')
+                message_content.append(LLMChatTextContent(text=f"<media_msg id={media_id} desc=\"{description}\" status=\"error: 媒体资源无效\"/> "))
+            last_index = start_index + len(f'<media_msg id={media_id} desc="{description}" />')
 
         # 处理剩余的文本内容
         if last_index < len(content):

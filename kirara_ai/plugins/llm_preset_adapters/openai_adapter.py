@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.media import MediaManager
 
 
@@ -84,7 +84,23 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             print(f"API Response: {response.text}")
             raise e
         print(response_data)
-        return LLMChatResponse(**response_data)
+        content = [
+            LLMChatTextContent(text=response_data["choices"][0]["message"]["content"])
+        ]
+        return LLMChatResponse(
+            model=req.model,
+            usage=Usage(
+                prompt_tokens=response_data["usage"]["prompt_tokens"],
+                completion_tokens=response_data["usage"]["completion_tokens"],
+                total_tokens=response_data["usage"]["total_tokens"],
+            ),
+            message=Message(
+                content=content,
+                role=response_data["choices"][0]["message"]["role"],
+                tool_calls=response_data["choices"][0]["message"]["tool_calls"],
+                finish_reason=response_data["choices"][0]["finish_reason"],
+            ),
+        )
 
     async def auto_detect_models(self) -> list[str]:
         api_url = f"{self.config.api_base}/models"

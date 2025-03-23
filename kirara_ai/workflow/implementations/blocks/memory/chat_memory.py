@@ -120,8 +120,8 @@ class ChatMemoryStore(Block):
         else:
             composed_messages = [user_msg]
         if llm_resp is not None:
-            if llm_resp.choices and llm_resp.choices[0].message:
-                composed_messages.append(llm_resp.choices[0].message)
+            if llm_resp.message:
+                composed_messages.append(llm_resp.message)
         if not composed_messages:
             self.logger.warning("No messages to store")
             return {}
