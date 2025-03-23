@@ -6,6 +6,8 @@ from kirara_ai.im.message import IMMessage, MediaMessage
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.response import Message
+from kirara_ai.logger import get_logger
+from kirara_ai.media.manager import MediaManager
 from kirara_ai.memory.entry import MemoryEntry
 
 from .base import ComposableMessageType, MemoryComposer, MemoryDecomposer
@@ -63,6 +65,8 @@ class DefaultMemoryDecomposer(MemoryDecomposer):
 
 
 class MultiElementDecomposer(MemoryDecomposer):
+    logger = get_logger("MultiElementDecomposer")
+    
     def decompose(self, entries: List[MemoryEntry]) -> List[LLMChatMessage]:
         decomposed_messages = []
         for entry in entries:
@@ -105,8 +109,13 @@ class MultiElementDecomposer(MemoryDecomposer):
             if start_index > last_index:
                 text_content = content[last_index:start_index]
                 message_content.append(LLMChatTextContent(text=text_content))
-
-            message_content.append(LLMChatImageContent(media_id=media_id))
+            # 校验媒体资源有效性
+            media_object = self.container.resolve(MediaManager).get_media(media_id)
+            if media_object:
+                message_content.append(LLMChatImageContent(media_object=media_object))
+            else:
+                self.logger.warning(f"媒体资源无效: {media_id}")
+                message_content.append(LLMChatTextContent(text=f"<media_msg id={media_id} description=\"{description}\" status=\"error: 媒体资源无效\"/> "))
             last_index = start_index + len(f'<media_msg id={media_id} description="{description}" />')
 
         # 处理剩余的文本内容

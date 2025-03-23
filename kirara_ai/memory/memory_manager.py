@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Type
 
 from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.ioc.container import DependencyContainer
+from kirara_ai.ioc.inject import Inject
 from kirara_ai.memory.persistences.base import AsyncMemoryPersistence, MemoryPersistence
 from kirara_ai.memory.persistences.file_persistence import FileMemoryPersistence
 from kirara_ai.memory.persistences.redis_persistence import RedisMemoryPersistence
@@ -24,9 +25,9 @@ class MemoryManager:
         self.config = container.resolve(GlobalConfig).memory
 
         # 初始化注册表
-        self.scope_registry = ScopeRegistry()
-        self.composer_registry = ComposerRegistry()
-        self.decomposer_registry = DecomposerRegistry()
+        self.scope_registry = Inject(container).create(ScopeRegistry)()
+        self.composer_registry = Inject(container).create(ComposerRegistry)()
+        self.decomposer_registry = Inject(container).create(DecomposerRegistry)()
 
         # 注册到容器
         container.register(ScopeRegistry, self.scope_registry)
