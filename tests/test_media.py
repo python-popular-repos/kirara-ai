@@ -79,13 +79,13 @@ class TestMediaManager(unittest.TestCase):
 
     def test_register_from_path(self):
         """测试从文件路径注册媒体"""
-        media_id = self.media_manager.register_from_path(
+        media_id = asyncio.run(self.media_manager.register_from_path(
             self.test_image_path,
             source="test",
             description="测试图片",
             tags=["test", "image"],
             reference_id="test_ref"
-        )
+        ))
 
         # 验证媒体ID是否有效
         self.assertIsNotNone(media_id)
@@ -109,14 +109,14 @@ class TestMediaManager(unittest.TestCase):
         with open(self.test_image_path, "rb") as f:
             data = f.read()
             
-        media_id = self.media_manager.register_from_data(
+        media_id = asyncio.run(self.media_manager.register_from_data(
             data,
             format="jpeg",
             source="test_data",
             description="测试数据图片",
             tags=["test", "data"],
             reference_id="test_data_ref"
-        )
+        ))
         
         # 验证媒体ID是否有效
         self.assertIsNotNone(media_id)
@@ -135,13 +135,13 @@ class TestMediaManager(unittest.TestCase):
         # 使用本地文件URL作为测试
         file_url = f"file://{Path(self.test_image_path).absolute()}"
         
-        media_id = self.media_manager.register_from_url(
+        media_id = asyncio.run(self.media_manager.register_from_url(
             file_url,
             source="test_url",
             description="测试URL图片",
             tags=["test", "url"],
             reference_id="test_url_ref"
-        )
+        ))
         
         # 验证媒体ID是否有效
         self.assertIsNotNone(media_id)
@@ -168,40 +168,40 @@ class TestMediaManager(unittest.TestCase):
         """测试不同格式文件的类型检测"""
         # 图片格式测试
         for format_name in ["jpeg", "png", "gif", "webp"]:
-            media_id = self.media_manager.register_from_path(
+            media_id = asyncio.run(self.media_manager.register_from_path(
                 self.format_files[format_name],
                 reference_id=f"test_{format_name}"
-            )
+            ))
             metadata = self.media_manager.get_metadata(media_id)
             self.assertEqual(metadata.media_type, MediaType.IMAGE, f"格式 {format_name} 应该被识别为图片")
             self.assertEqual(metadata.format.lower(), format_name.lower(), f"格式 {format_name} 未被正确识别")
         
         # 音频格式测试
         for format_name in ["mp3", "wav"]:
-            media_id = self.media_manager.register_from_path(
+            media_id = asyncio.run(self.media_manager.register_from_path(
                 self.format_files[format_name],
                 reference_id=f"test_{format_name}"
-            )
+            ))
             metadata = self.media_manager.get_metadata(media_id)
-            self.assertEqual(metadata.media_type, MediaType.VOICE, f"格式 {format_name} 应该被识别为音频")
+            self.assertEqual(metadata.media_type, MediaType.AUDIO, f"格式 {format_name} 应该被识别为音频")
             self.assertEqual(metadata.format.lower(), format_name.lower(), f"格式 {format_name} 未被正确识别")
         
         # 视频格式测试
         for format_name in ["mp4", "avi"]:
-            media_id = self.media_manager.register_from_path(
+            media_id = asyncio.run(self.media_manager.register_from_path(
                 self.format_files[format_name],
                 reference_id=f"test_{format_name}"
-            )
+            ))
             metadata = self.media_manager.get_metadata(media_id)
             self.assertEqual(metadata.media_type, MediaType.VIDEO, f"格式 {format_name} 应该被识别为视频")
             self.assertEqual(metadata.format.lower(), format_name.lower() if format_name != "avi" else "x-msvideo", f"格式 {format_name} 未被正确识别")
         
         # 文档格式测试
         for format_name in ["pdf", "txt"]:
-            media_id = self.media_manager.register_from_path(
+            media_id = asyncio.run(self.media_manager.register_from_path(
                 self.format_files[format_name],
                 reference_id=f"test_{format_name}"
-            )
+            ))
             metadata = self.media_manager.get_metadata(media_id)
             self.assertEqual(metadata.media_type, MediaType.FILE, f"格式 {format_name} 应该被识别为文件")
             expected_format = format_name
@@ -213,10 +213,10 @@ class TestMediaManager(unittest.TestCase):
         """测试懒加载策略"""
         # 注册一个只有URL的媒体
         file_url = f"file://{Path(self.test_image_path).absolute()}"
-        url_media_id = self.media_manager.register_from_url(
+        url_media_id = asyncio.run(self.media_manager.register_from_url(
             file_url,
             reference_id="url_ref"
-        )
+        ))
         
         # 初始元数据应该只有URL
         metadata = self.media_manager.get_metadata(url_media_id)
@@ -241,10 +241,10 @@ class TestMediaManager(unittest.TestCase):
     def test_reference_management(self):
         """测试引用管理"""
         # 注册媒体
-        media_id = self.media_manager.register_from_path(
+        media_id = asyncio.run(self.media_manager.register_from_path(
             self.test_image_path,
             reference_id="ref1"
-        )
+        ))
         
         # 添加引用
         self.media_manager.add_reference(media_id, "ref2")
@@ -269,21 +269,21 @@ class TestMediaManager(unittest.TestCase):
     def test_search(self):
         """测试搜索功能"""
         # 注册多个媒体
-        media_id1 = self.media_manager.register_from_path(
+        media_id1 = asyncio.run(self.media_manager.register_from_path(
             self.test_image_path,
             source="source1",
             description="description with keyword1",
             tags=["tag1", "common"],
             reference_id="ref1"
-        )
+        ))
         
-        media_id2 = self.media_manager.register_from_path(
+        media_id2 = asyncio.run(self.media_manager.register_from_path(
             self.test_audio_path,
             source="source2",
             description="description with keyword2",
             tags=["tag2", "common"],
             reference_id="ref2"
-        )
+        ))
         
         # 根据标签搜索
         results = self.media_manager.search_by_tags(["tag1"])
@@ -304,7 +304,7 @@ class TestMediaManager(unittest.TestCase):
         results = self.media_manager.search_by_type(MediaType.IMAGE)
         self.assertEqual(results, [media_id1])
         
-        results = self.media_manager.search_by_type(MediaType.VOICE)
+        results = self.media_manager.search_by_type(MediaType.AUDIO)
         self.assertEqual(results, [media_id2])
 
     def test_media_message(self):
@@ -377,7 +377,7 @@ class TestMediaManager(unittest.TestCase):
             
             # 获取元数据
             metadata = self.media_manager.get_metadata(message.media_id)
-            self.assertEqual(metadata.media_type, MediaType.VOICE)
+            self.assertEqual(metadata.media_type, MediaType.AUDIO)
             
 if __name__ == "__main__":
     unittest.main() 

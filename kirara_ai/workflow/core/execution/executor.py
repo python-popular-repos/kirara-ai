@@ -184,6 +184,8 @@ class WorkflowExecutor:
                 else:
                     # self.logger.debug(f"Block {block.name} is terminal node")
                     pass
+            except BlockExecutionFailedException as e:
+                raise e
             except Exception as e:
                 raise BlockExecutionFailedException(f"Block {block.name} execution failed") from e
 

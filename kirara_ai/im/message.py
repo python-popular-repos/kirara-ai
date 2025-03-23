@@ -70,14 +70,38 @@ class MediaMessage(MessageElement):
             return
 
         # 注册媒体文件
-        self._register_media()
+        
+        # 使用线程创建新的事件循环来阻塞执行媒体注册
+        import asyncio
+        import threading
 
-    def _register_media(self) -> None:
+        # 用于存储线程中的异常
+        thread_exception = None
+        
+        def run_in_new_loop():
+            nonlocal thread_exception
+            try:
+                asyncio.run(self._register_media())
+            except Exception as e:
+                thread_exception = e
+                
+        # 在新线程中运行异步注册函数
+        thread = threading.Thread(
+            target=run_in_new_loop, 
+        )
+        thread.start()
+        thread.join()  # 阻塞等待完成
+        
+        # 如果线程中发生异常，则在主线程中重新抛出
+        if thread_exception:
+            raise thread_exception
+
+    async def _register_media(self) -> None:
         """注册媒体文件"""
         media_manager = self._media_manager
         
         # 根据传入的参数注册媒体文件
-        self.media_id = media_manager.register_media(
+        self.media_id = await media_manager.register_media(
             url=self.url,
             path=self.path,
             data=self.data,

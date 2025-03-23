@@ -59,9 +59,11 @@ class MediaManager:
         """获取媒体文件路径"""
         return self.files_dir / f"{media_id}.{format}"
     
-    def _create_task(self, coro, name=None):
+    def _create_task(self, coro, name=None, loop=None):
         """创建后台任务并跟踪它"""
-        task = asyncio.create_task(coro, name=name)
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        task = asyncio.ensure_future(coro, loop=loop)
         self._pending_tasks.add(task)
         task.add_done_callback(self._pending_tasks.discard)
         return task
@@ -85,7 +87,21 @@ class MediaManager:
                 raise ValueError(f"Failed to download file from {url}, status: {resp.status_code}")
             return resp.content
     
-    def register_media(
+    def _download_file_sync(self, url: str) -> bytes:
+        """同步下载文件"""
+        from curl_cffi import Response, Session
+
+        # 如果 url 是 file:// 开头，则直接返回文件内容
+        if url.startswith("file://"):
+            with open(url[7:], "rb") as f:
+                return f.read()
+        with Session() as session:
+            resp: Response = session.get(url)
+            if resp.status_code != 200:
+                raise ValueError(f"Failed to download file from {url}, status: {resp.status_code}")
+            return resp.content
+    
+    async def register_media(
         self,
         url: Optional[str] = None,
         path: Optional[str] = None,
@@ -169,59 +185,32 @@ class MediaManager:
             
             def copy_file():
                 shutil.copy2(path, target_path)
-            
-            # 创建后台任务
-            try:
-                loop = asyncio.get_event_loop()                
-                self._create_task(asyncio.to_thread(copy_file), f"copy_file_{media_id}")
-                # 如果没有运行中的事件循环，直接复制
-            except Exception as e:
-                if "event loop" in str(e):
-                    copy_file()
-                else:
-                    self.logger.error(f"Failed to copy file: {e}")
+                
+            await asyncio.to_thread(copy_file)
 
         # 如果提供了data，在后台保存文件
         elif data and format:
             target_path = self._get_file_path(media_id, format)
-            
-            async def save_file():
-                await self._save_file_async(data, target_path)
-            
-            # 创建后台任务
             try:
-                loop = asyncio.get_event_loop()
-                self._create_task(save_file(), f"save_file_{media_id}")
+                await self._save_file_async(data, target_path)
             except Exception as e:
-                if "no running event loop" in str(e):
-                    with open(target_path, "wb") as f:
-                        f.write(data)
-                else:
-                    self.logger.error(f"Failed to save file: {e}")
+                self.logger.error(f"Failed to save file: {e}", exc_info=True)
                     
         # 如果提供了 url，在后台保存文件
         elif url:
             target_path = self._get_file_path(media_id, format)
             
-            async def save_file():
+            try:
                 data = await self._download_file_async(url)
                 metadata.size = len(data)
                 self._save_metadata(metadata)
                 await self._save_file_async(data, target_path)
-            
-            # 创建后台任务
-            try:
-                loop = asyncio.get_event_loop()
-                self._create_task(save_file(), f"save_file_{media_id}")
-                loop.run_until_complete(save_file())
             except Exception as e:
-                if "no running event loop" in str(e):
-                    with open(target_path, "wb") as f:
-                        f.write(data)
+                self.logger.error(f"Failed to save file: {e}", exc_info=True)
         
         return media_id
     
-    def register_from_path(
+    async def register_from_path(
         self, 
         path: str, 
         source: Optional[str] = None,
@@ -235,7 +224,7 @@ class MediaManager:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {path}")
         
-        return self.register_media(
+        return await self.register_media(
             path=path,
             source=source,
             description=description,
@@ -243,7 +232,7 @@ class MediaManager:
             reference_id=reference_id
         )
     
-    def register_from_url(
+    async def register_from_url(
         self, 
         url: str, 
         source: Optional[str] = None,
@@ -252,7 +241,7 @@ class MediaManager:
         reference_id: Optional[str] = None
     ) -> str:
         """从URL注册媒体"""
-        return self.register_media(
+        return await self.register_media(
             url=url,
             source=source,
             description=description,
@@ -260,7 +249,7 @@ class MediaManager:
             reference_id=reference_id
         )
     
-    def register_from_data(
+    async def register_from_data(
         self, 
         data: bytes,
         format: Optional[str] = None,
@@ -270,7 +259,7 @@ class MediaManager:
         reference_id: Optional[str] = None
     ) -> str:
         """从二进制数据注册媒体"""
-        return self.register_media(
+        return await self.register_media(
             data=data,
             format=format,
             source=source,
@@ -617,5 +606,5 @@ class MediaManager:
     def __new__(cls, *args, **kwargs) -> "MediaManager":
         if not hasattr(cls, "_instance"):
             print("new MediaManager")
-            cls._instance = super().__new__(cls, *args, **kwargs)
+            cls._instance = super(MediaManager, cls).__new__(cls)
         return cls._instance

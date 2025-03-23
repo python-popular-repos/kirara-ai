@@ -71,8 +71,6 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "stream": req.stream,
         }
 
-
-
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
 
@@ -91,7 +89,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 content.append(LLMChatTextContent(text=res["text"]))
             elif res["type"] == "image":
                 data = base64.b64decode(res["source"]["data"])
-                media = self.media_manager.register_from_data(data, res["source"]["mime_type"], source="claude response")
+                media = loop.run_until_complete(self.media_manager.register_from_data(data, res["source"]["mime_type"], source="claude response"))
                 content.append(LLMChatImageContent(media_id=media))
 
         return LLMChatResponse(

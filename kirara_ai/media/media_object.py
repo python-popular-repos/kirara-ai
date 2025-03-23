@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.media.metadata import MediaMetadata
@@ -104,68 +104,6 @@ class Media:
     async def create_message(self):
         """创建媒体消息对象"""
         return await self._manager.create_media_message(self.media_id)
-    
-    @classmethod
-    def from_path(
-        cls, 
-        path: Union[str, Path], 
-        source: Optional[str] = None,
-        description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        reference_id: Optional[str] = None,
-        manager: Optional[MediaManager] = None
-    ) -> 'Media':
-        """从文件路径创建媒体对象"""
-        media_id = manager.register_from_path(
-            str(path),
-            source=source,
-            description=description,
-            tags=tags,
-            reference_id=reference_id
-        )
-        return cls(media_id, manager)
-    
-    @classmethod
-    def from_url(
-        cls, 
-        url: str, 
-        source: Optional[str] = None,
-        description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        reference_id: Optional[str] = None,
-        manager: Optional[MediaManager] = None
-    ) -> 'Media':
-        """从URL创建媒体对象"""
-        media_id = manager.register_from_url(
-            url,
-            source=source,
-            description=description,
-            tags=tags,
-            reference_id=reference_id
-        )
-        return cls(media_id, manager)
-    
-    @classmethod
-    def from_data(
-        cls, 
-        data: bytes,
-        format: Optional[str] = None,
-        source: Optional[str] = None,
-        description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        reference_id: Optional[str] = None,
-        manager: Optional[MediaManager] = None
-    ) -> 'Media':
-        """从二进制数据创建媒体对象"""
-        media_id = manager.register_from_data(
-            data,
-            format=format,
-            source=source,
-            description=description,
-            tags=tags,
-            reference_id=reference_id
-        )
-        return cls(media_id, manager)
     
     def __str__(self) -> str:
         metadata = self.metadata

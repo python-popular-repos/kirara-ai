@@ -103,7 +103,6 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         if req.model in IMAGE_MODAL_MODELS:
             data["generationConfig"]["responseModalities"] = ["text", "image"]
 
-        self.logger.debug(f"Contents: {data['contents']}")
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
         response = requests.post(api_url, json=data, headers=headers)
@@ -113,14 +112,13 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         except Exception as e:
             print(f"API Response: {response.text}")
             raise e
-        self.logger.debug(f"API Response: {response_data}")
         content = []
         for part in response_data["candidates"][0]["content"]["parts"]:
             if "text" in part:
                 content.append(LLMChatTextContent(text=part["text"]))
             elif "inlineData" in part :
                 data = base64.b64decode(part["inlineData"]["data"])
-                media = self.media_manager.register_from_data(data=data, format=part["inlineData"]["mimeType"].removeprefix("image/"), source="gemini response")
+                media = loop.run_until_complete(self.media_manager.register_from_data(data=data, format=part["inlineData"]["mimeType"].removeprefix("image/"), source="gemini response"))
                 content.append(LLMChatImageContent(media_id=media))
                 
         return LLMChatResponse(
