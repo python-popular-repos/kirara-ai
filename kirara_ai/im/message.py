@@ -198,7 +198,7 @@ class ImageMessage(MediaMessage):
         return result
 
     def to_plain(self):
-        return f"[ImageMessage:url={self.url},alt={self.get_description()}]"
+        return f"[ImageMessage:media_id={self.media_id},url={self.url},alt={self.get_description()}]"
 
     def __repr__(self):
         return f"ImageMessage(media_id={self.media_id}, url={self.url}, path={self.path}, format={self.format})"

@@ -17,7 +17,7 @@ from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMBackendRegistry
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
-from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomposer
+from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomposer, MultiElementDecomposer
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.scopes import GlobalScope, GroupScope, MemberScope
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
@@ -78,6 +78,7 @@ def init_memory_system(container: DependencyContainer):
     # 注册默认组合器和解析器
     memory_manager.register_composer("default", DefaultMemoryComposer)
     memory_manager.register_decomposer("default", DefaultMemoryDecomposer)
+    memory_manager.register_decomposer("multi_element", MultiElementDecomposer)
 
     container.register(MemoryManager, memory_manager)
     return memory_manager

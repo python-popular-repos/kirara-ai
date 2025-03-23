@@ -25,10 +25,10 @@ class MemoryDecomposer(ABC):
     """记忆解析器抽象类"""
 
     @abstractmethod
-    def decompose(self, entries: List[MemoryEntry]) -> str:
-        """将记忆条目转换为字符串"""
+    def decompose(self, entries: List[MemoryEntry]) -> List[ComposableMessageType]:
+        """将记忆条目转换为消息"""
 
     @property
-    def empty_message(self) -> str:
+    def empty_message(self) -> ComposableMessageType:
         """空记忆消息"""
         return "<空记忆>"
