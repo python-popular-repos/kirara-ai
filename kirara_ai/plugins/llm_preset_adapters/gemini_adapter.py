@@ -105,9 +105,10 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
 
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
-        response = requests.post(api_url, json=data, headers=headers)
+        
+        response = self._post_with_retry(api_url, json=data, headers=headers)
+        
         try:
-            response.raise_for_status()
             response_data = response.json()
         except Exception as e:
             print(f"API Response: {response.text}")
@@ -151,3 +152,16 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                     for model in response_data["models"]
                     if "generateContent" in model["supportedGenerationMethods"]
                 ]
+
+    def _post_with_retry(self, url: str, json: dict, headers: dict, retry_count: int = 3) -> requests.Response:
+        for i in range(retry_count):
+            try:
+                response = requests.post(url, json=json, headers=headers)
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                if i == retry_count - 1:
+                    print(f"API Response: {response.text if 'response' in locals() else 'No response'}")
+                    raise e
+                else:
+                    self.logger.warning(f"Request failed, retrying {i+1}/{retry_count}: {e}")

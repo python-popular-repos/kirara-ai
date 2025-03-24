@@ -1,3 +1,4 @@
+import asyncio
 import io
 import os
 from typing import Optional
@@ -16,16 +17,29 @@ media_bp = Blueprint("media", __name__)
 
 
 # 生成缩略图
-async def generate_thumbnail(data):
-    """生成图片缩略图"""
+async def generate_thumbnail(image_data: bytes) -> io.BytesIO:
+    """生成图片缩略图，并返回BytesIO对象"""
     from PIL import Image
-    
-    with Image.open(io.BytesIO(data)) as img:
-        img.thumbnail((300, 300))
-        output = io.BytesIO()
-        img.convert("RGB").save(output, format="JPEG")
-        output.seek(0)
-        return output
+
+    def _generate_thumbnail(image_data: bytes) -> io.BytesIO:
+        """在线程中运行的同步缩略图生成函数"""
+        with Image.open(io.BytesIO(image_data)) as img:
+            width, height = img.size
+            if width > height:
+                new_width = 300
+                new_height = int(height * (300 / width))
+            else:
+                new_height = 300
+                new_width = int(width * (300 / height))
+
+            img.thumbnail((new_width, new_height))
+            output = io.BytesIO()
+            img = img.convert("RGB")
+            img.save(output, format="WEBP", optimize=True, quality=65)
+            output.seek(0)
+            return output
+
+    return await asyncio.to_thread(_generate_thumbnail, image_data)
 
 def _get_media_manager() -> MediaManager:
     """获取媒体管理器实例"""
@@ -160,8 +174,9 @@ async def get_thumbnail(media_id):
         if media.metadata.format == "gif":
             return await send_file(io.BytesIO(data), mimetype="image/gif")
         thumbnail = await generate_thumbnail(data)
-        return await send_file(thumbnail, mimetype="image/jpeg")
+        return await send_file(thumbnail, mimetype="image/webp")
     elif media.metadata.media_type == MediaType.VIDEO:
+        # 视频类型直接返回原始数据，不做缩略图处理
         return await send_file(io.BytesIO(data), mimetype="video/mp4")
     else:
         return jsonify({"error": "Unsupported media type"}), 400
