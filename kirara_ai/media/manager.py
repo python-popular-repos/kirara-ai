@@ -1,8 +1,8 @@
 import asyncio
 import base64
+import hashlib
 import json
 import shutil
-import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
@@ -112,11 +112,11 @@ class MediaManager:
         source: Optional[str] = None,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        reference_id: Optional[str] = None
+        reference_id: Optional[str] = None,
     ) -> str:
         """
         注册媒体（统一方法）
-        
+
         Args:
             url: 媒体URL
             path: 媒体文件路径
@@ -128,38 +128,61 @@ class MediaManager:
             description: 媒体描述
             tags: 媒体标签
             reference_id: 引用ID
-            
+
         Returns:
             str: 媒体ID
         """
         # 检查参数
         if not any([url, path, data]):
             raise ValueError("Must provide at least one of url, path, or data")
-        
-        # 生成唯一ID
-        media_id = str(uuid.uuid4())
-        
-        # 如果提供了path，获取文件大小
-        if path and not size:
+
+        # 获取数据
+        if path:
             file_path = Path(path)
-            if file_path.exists():
-                size = file_path.stat().st_size
-        
-        # 如果提供了data，获取数据大小
-        if data and not size:
+            if not file_path.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+            try:
+                async with aiofiles.open(file_path, "rb") as f:
+                    data = await f.read()
+            except Exception as e:
+                self.logger.error(f"Failed to read file: {e}", exc_info=True)
+                raise
+        elif url:
+            try:
+                data = await self._download_file_async(url)
+            except Exception as e:
+                self.logger.error(f"Failed to download file: {e}", exc_info=True)
+                raise
+
+        # 计算 SHA1
+        hash_data = await asyncio.to_thread(hashlib.sha1, data)
+        media_id = hash_data.hexdigest()
+
+        # 检查是否已存在相同 media_id 的媒体
+        if media_id in self.metadata_cache:
+            self.logger.info(f"Media already exists: {media_id}")
+            return media_id
+
+        # 获取数据大小
+        if not size:
             size = len(data)
-        
-        # 如果提供了data，检测文件类型
-        if data and (not media_type or not format):
+
+        # 检测文件类型
+        if not media_type or not format:
             mime_type, detected_media_type, detected_format = detect_mime_type(data=data)
             media_type = media_type or detected_media_type
             format = format or detected_format
-        
-        # 如果提供了path，检测文件类型
-        if path and (not media_type or not format):
-            mime_type, detected_media_type, detected_format = detect_mime_type(path=path)
-            media_type = media_type or detected_media_type
-            format = format or detected_format
+
+        # 保存文件
+        if format:
+            target_path = self._get_file_path(media_id, format)
+            try:
+                await self._save_file_async(data, target_path)
+            except Exception as e:
+                self.logger.error(f"Failed to save file: {e}", exc_info=True)
+                raise
+        else:
+            raise ValueError("No format detected")
         
         # 创建元数据
         metadata = MediaMetadata(
@@ -173,41 +196,12 @@ class MediaManager:
             tags=tags,
             references=set([reference_id]) if reference_id else set(),
             url=url,
-            path=path
+            path=path,
         )
-        
+
         # 保存元数据
         self._save_metadata(metadata)
-        
-        # 如果提供了path，在后台复制文件
-        if path and format:
-            target_path = self._get_file_path(media_id, format)
-            
-            def copy_file():
-                shutil.copy2(path, target_path)
-                
-            await asyncio.to_thread(copy_file)
-
-        # 如果提供了data，在后台保存文件
-        elif data and format:
-            target_path = self._get_file_path(media_id, format)
-            try:
-                await self._save_file_async(data, target_path)
-            except Exception as e:
-                self.logger.error(f"Failed to save file: {e}", exc_info=True)
-                    
-        # 如果提供了 url，在后台保存文件
-        elif url:
-            target_path = self._get_file_path(media_id, format)
-            
-            try:
-                data = await self._download_file_async(url)
-                metadata.size = len(data)
-                self._save_metadata(metadata)
-                await self._save_file_async(data, target_path)
-            except Exception as e:
-                self.logger.error(f"Failed to save file: {e}", exc_info=True)
-        
+        self.logger.info(f"Registered media: {media_id}")
         return media_id
     
     async def register_from_path(

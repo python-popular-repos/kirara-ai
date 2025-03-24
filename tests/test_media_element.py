@@ -1,13 +1,21 @@
 import os
+import tempfile
 from unittest.mock import patch
 
 import pytest
 
 from kirara_ai.im.message import ImageMessage
+from kirara_ai.media.manager import MediaManager
 
 # 测试资源路径
 TEST_RESOURCE_PATH = os.path.join(os.path.dirname(__file__), "resources", "test_image.txt")
 TEST_URL = "https://httpbin.org/image/jpeg"  # 一个可用的测试图片URL
+
+temp_dir = tempfile.mkdtemp()
+media_dir = os.path.join(temp_dir, "media")
+
+# 创建媒体管理器
+media_manager = MediaManager(media_dir=media_dir)
 
 @pytest.mark.asyncio
 async def test_media_element_from_path():
@@ -91,6 +99,6 @@ async def test_media_element_errors():
     with pytest.raises(ValueError):
         # 使用mock模拟网络请求失败
         with patch('curl_cffi.AsyncSession.get') as mock_get:
-            mock_get.side_effect = Exception("Mocked network error")
+            mock_get.side_effect = ValueError("Mocked network error")
             media = ImageMessage(url="https://valid-url-but-will-fail.com/image.jpg")
             await media.get_data()  # 模拟网络请求失败

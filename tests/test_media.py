@@ -209,35 +209,6 @@ class TestMediaManager(unittest.TestCase):
                 expected_format = "plain"
             self.assertTrue(metadata.format.lower().endswith(expected_format.lower()), f"格式 {format_name} 未被正确识别，实际为 {metadata.format}")
 
-    def test_lazy_loading(self):
-        """测试懒加载策略"""
-        # 注册一个只有URL的媒体
-        file_url = f"file://{Path(self.test_image_path).absolute()}"
-        url_media_id = asyncio.run(self.media_manager.register_from_url(
-            file_url,
-            reference_id="url_ref"
-        ))
-        
-        # 初始元数据应该只有URL
-        metadata = self.media_manager.get_metadata(url_media_id)
-        self.assertEqual(metadata.url, file_url)
-        self.assertIsNone(metadata.media_type)
-        self.assertIsNone(metadata.format)
-        
-        # 获取数据（触发下载和类型检测）
-        data = asyncio.run(self.media_manager.get_data(url_media_id))
-        self.assertIsNotNone(data)
-        
-        # 再次检查元数据，应该有更多信息
-        metadata = self.media_manager.get_metadata(url_media_id)
-        self.assertIsNotNone(metadata.media_type)
-        self.assertIsNotNone(metadata.format)
-        
-        # 获取文件路径（文件应该已经存在）
-        file_path = asyncio.run(self.media_manager.get_file_path(url_media_id))
-        self.assertIsNotNone(file_path)
-        self.assertTrue(file_path.exists())
-
     def test_reference_management(self):
         """测试引用管理"""
         # 注册媒体
@@ -379,5 +350,3 @@ class TestMediaManager(unittest.TestCase):
             metadata = self.media_manager.get_metadata(message.media_id)
             self.assertEqual(metadata.media_type, MediaType.AUDIO)
             
-if __name__ == "__main__":
-    unittest.main() 
