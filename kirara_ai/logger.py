@@ -139,12 +139,7 @@ class LogBroadcaster:
         发送最近的日志到指定回调
         :param callback: 回调函数，接收日志条目并处理
         """
-        for log_entry in _recent_logs:
-            try:
-                callback(log_entry)
-            except Exception:
-                # 如果发送失败，直接返回
-                return
+        callback(list(_recent_logs))
 
 # WebSocket日志处理器，作为LogBroadcaster的一个应用
 class WebSocketLogHandler:
