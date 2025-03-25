@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import functools
-import re
 import uuid
 from typing import Optional
 
@@ -18,6 +17,8 @@ from kirara_ai.im.sender import ChatSender, ChatType
 from kirara_ai.logger import get_logger
 from kirara_ai.web.app import WebServer
 from kirara_ai.workflow.core.dispatch import WorkflowDispatcher
+
+from .utils import URL_PATTERN
 
 WEBHOOK_URL_PREFIX = "/im/webhook/qqbot"
 
@@ -160,15 +161,12 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
             :return: 替换后的文本。
             """
             nonlocal url_replaced
-            url_pattern = re.compile(
-                r'((?:https?://)?(?:[-\w.]|(?:%[\da-fA-F]{2}))+/?)')
-            
             def replace_dots(match):
                 nonlocal url_replaced
                 url_replaced = True
                 return match.group(0).replace('.', '。')
 
-            return url_pattern.sub(replace_dots, text)
+            return URL_PATTERN.sub(replace_dots, text)
 
         async def send_text_message(text: str):
             """

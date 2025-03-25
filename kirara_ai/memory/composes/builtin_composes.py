@@ -99,6 +99,20 @@ class MultiElementDecomposer(MemoryDecomposer):
                 if user_message:
                     decomposed_messages.append(user_message)
 
+        # 合并相邻的相同角色消息
+        i = 0
+        while i < len(decomposed_messages) - 1:
+            current_msg = decomposed_messages[i]
+            next_msg = decomposed_messages[i + 1]
+            
+            if current_msg.role == next_msg.role:
+                # 合并内容
+                current_msg.content.extend(next_msg.content)
+                # 删除下一个消息
+                decomposed_messages.pop(i + 1)
+            else:
+                i += 1
+
         return decomposed_messages
 
     def create_llm_chat_message(self, content: str, role: str, sender: ChatSender) -> Union[LLMChatMessage, None]:

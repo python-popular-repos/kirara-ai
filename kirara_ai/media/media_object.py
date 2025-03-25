@@ -101,6 +101,10 @@ class Media:
         """获取媒体文件URL"""
         return await self._manager.get_url(self.media_id)
     
+    async def get_base64_url(self) -> Optional[str]:
+        """获取媒体文件 base64 URL"""
+        return f"data:{self.mime_type};base64,{await self.get_base64()}"
+    
     async def create_message(self):
         """创建媒体消息对象"""
         return await self._manager.create_media_message(self.media_id)

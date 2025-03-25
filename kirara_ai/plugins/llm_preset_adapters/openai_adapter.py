@@ -7,9 +7,11 @@ from pydantic import BaseModel, ConfigDict
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
+from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage
+from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 
+logger = get_logger("OpenAIAdapter")
 
 async def convert_llm_chat_message_to_openai_message(msg: LLMChatMessage, media_manager: MediaManager) -> dict:
     parts = []
@@ -22,11 +24,14 @@ async def convert_llm_chat_message_to_openai_message(msg: LLMChatMessage, media_
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": await media.get_url()
+                        "url": await media.get_base64_url()
                     }
                 }
             )
-    return parts
+    return {
+        "role": msg.role,
+        "content": parts
+    }
 
 class OpenAIConfig(BaseModel):
     api_key: str
@@ -75,15 +80,17 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
 
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
+        
+        logger.debug(f"Request: {data}")
 
         response = requests.post(api_url, json=data, headers=headers)
         try:
             response.raise_for_status()
             response_data = response.json()
         except Exception as e:
-            print(f"API Response: {response.text}")
+            logger.error(f"Response: {response.text}")
             raise e
-        print(response_data)
+        logger.debug(f"Response: {response_data}")
         content = [
             LLMChatTextContent(text=response_data["choices"][0]["message"]["content"])
         ]
@@ -97,7 +104,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             message=Message(
                 content=content,
                 role=response_data["choices"][0]["message"]["role"],
-                tool_calls=response_data["choices"][0]["message"]["tool_calls"],
+                tool_calls=[ToolCall(**tool_call) for tool_call in response_data["choices"][0]["message"].get("tool_calls", [])],
                 finish_reason=response_data["choices"][0]["finish_reason"],
             ),
         )
