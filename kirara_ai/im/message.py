@@ -59,7 +59,7 @@ class MediaMessage(MessageElement):
         self.data = data
         self.format = format
         self.media_id = media_id
-        self._reference_id = reference_id or f"im_message_{id(self)}"
+        self._reference_id = reference_id
         self._source = source
         self._description = description
         self._tags = tags or []

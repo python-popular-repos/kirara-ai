@@ -17,6 +17,7 @@ from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMBackendRegistry
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
+from kirara_ai.media.carrier import MediaCarrierRegistry, MediaCarrierService
 from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomposer, MultiElementDecomposer
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.scopes import GlobalScope, GroupScope, MemberScope
@@ -83,6 +84,11 @@ def init_memory_system(container: DependencyContainer):
     container.register(MemoryManager, memory_manager)
     return memory_manager
 
+def init_media_carrier(container: DependencyContainer):
+    """初始化媒体载体"""
+    # 注册记忆管理器作为媒体引用提供者
+    carrier_registry = container.resolve(MediaCarrierRegistry)
+    carrier_registry.register("memory", container.resolve(MemoryManager))
 
 def init_application() -> DependencyContainer:
     """初始化应用程序"""
@@ -116,9 +122,15 @@ def init_application() -> DependencyContainer:
     container = init_container()
     container.register(asyncio.AbstractEventLoop, asyncio.new_event_loop())
     container.register(EventBus, EventBus())
-    container.register(MediaManager, MediaManager())
+    
     container.register(GlobalConfig, config)
     container.register(BlockRegistry, BlockRegistry())
+    
+    # 注册媒体管理器
+    media_manager = MediaManager()
+    container.register(MediaManager, media_manager)
+    container.register(MediaCarrierRegistry, MediaCarrierRegistry(container))
+    container.register(MediaCarrierService, MediaCarrierService(container, media_manager))
     
     # 注册工作流注册表
     workflow_registry = WorkflowRegistry(container)
@@ -147,6 +159,8 @@ def init_application() -> DependencyContainer:
     # 初始化记忆系统
     logger.info("Initializing memory system...")
     init_memory_system(container)
+    
+    init_media_carrier(container)
 
     # 注册系统 blocks
     register_system_blocks(container.resolve(BlockRegistry))

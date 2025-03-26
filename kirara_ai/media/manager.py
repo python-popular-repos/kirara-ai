@@ -181,6 +181,7 @@ class MediaManager:
             except Exception as e:
                 self.logger.error(f"Failed to save file: {e}", exc_info=True)
                 raise
+            path = str(target_path)
         else:
             raise ValueError("No format detected")
         
@@ -281,9 +282,9 @@ class MediaManager:
             metadata.references.remove(reference_id)
             self._save_metadata(metadata)
             
-            # 如果没有引用了，删除文件
+            # 如果没有引用了，输出log提醒一下
             if not metadata.references:
-                self.delete_media(media_id)
+                self.logger.warning(f"No references found for media: {media_id}, file: {metadata.path}")
     
     def delete_media(self, media_id: str) -> None:
         """删除媒体文件和元数据"""

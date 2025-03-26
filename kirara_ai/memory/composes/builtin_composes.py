@@ -17,6 +17,7 @@ class DefaultMemoryComposer(MemoryComposer):
         self, sender: ChatSender, message: List[ComposableMessageType]
     ) -> MemoryEntry:
         composed_message = ""
+        media_ids = []
         for msg in message:
             if isinstance(msg, IMMessage):
                 composed_message += f"{sender.display_name} 说: \n"
@@ -24,6 +25,7 @@ class DefaultMemoryComposer(MemoryComposer):
                     if isinstance(element, MediaMessage):
                         desc = element.get_description()
                         composed_message += f"<media_msg id={element.media_id} desc=\"{desc}\" />\n"
+                        media_ids.append(element.media_id)
                     elif isinstance(element, TextMessage):
                         composed_message += f"{element.to_plain()}\n"
                     else:
@@ -37,6 +39,7 @@ class DefaultMemoryComposer(MemoryComposer):
                         media = self.container.resolve(MediaManager).get_media(part.media_id)
                         desc = media.description
                         composed_message += f"<media_msg id={part.media_id} desc=\"{desc}\" />\n"
+                        media_ids.append(part.media_id)
 
         composed_message = composed_message.strip()
         composed_at = datetime.now()
@@ -44,6 +47,9 @@ class DefaultMemoryComposer(MemoryComposer):
             sender=sender,
             content=composed_message,
             timestamp=composed_at,
+            metadata={
+                "_media_ids": media_ids,
+            },
         )
 
 
