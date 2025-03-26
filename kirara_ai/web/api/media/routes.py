@@ -3,6 +3,7 @@ import io
 import os
 from typing import Optional
 
+import pytz
 from quart import Blueprint, g, jsonify, request, send_file
 
 from kirara_ai.config.global_config import GlobalConfig
@@ -116,9 +117,13 @@ async def list_media():
         for media_id in all_media_ids:
             metadata = manager.get_metadata(media_id)
             if metadata:
-                if search_params.start_date and metadata.created_at < search_params.start_date:
+                tz = pytz.timezone(g.container.resolve(GlobalConfig).system.timezone)
+                created_at = metadata.created_at.replace(tzinfo=tz)
+                start_date = search_params.start_date.replace(tzinfo=tz)
+                end_date = search_params.end_date.replace(tzinfo=tz)
+                if search_params.start_date and created_at < start_date:
                     continue
-                if search_params.end_date and metadata.created_at > search_params.end_date:
+                if search_params.end_date and created_at > end_date:
                     continue
                 filtered_ids.append(media_id)
         all_media_ids = filtered_ids

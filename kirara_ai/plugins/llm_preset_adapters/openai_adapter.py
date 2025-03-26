@@ -91,21 +91,29 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             logger.error(f"Response: {response.text}")
             raise e
         logger.debug(f"Response: {response_data}")
+
+        choices = response_data.get("choices", [{}])
+        first_choice = choices[0] if choices else {}
+        message = first_choice.get("message", {})
+        
         content = [
-            LLMChatTextContent(text=response_data["choices"][0]["message"]["content"])
+            LLMChatTextContent(text=message.get("content", ""))
         ]
+        
+        usage_data = response_data.get("usage", {})
+        
         return LLMChatResponse(
             model=req.model,
             usage=Usage(
-                prompt_tokens=response_data["usage"]["prompt_tokens"],
-                completion_tokens=response_data["usage"]["completion_tokens"],
-                total_tokens=response_data["usage"]["total_tokens"],
+                prompt_tokens=usage_data.get("prompt_tokens", 0),
+                completion_tokens=usage_data.get("completion_tokens", 0),
+                total_tokens=usage_data.get("total_tokens", 0),
             ),
             message=Message(
                 content=content,
-                role=response_data["choices"][0]["message"]["role"],
-                tool_calls=[ToolCall(**tool_call) for tool_call in response_data["choices"][0]["message"].get("tool_calls", [])],
-                finish_reason=response_data["choices"][0]["finish_reason"],
+                role=message.get("role", "assistant"),
+                tool_calls=[ToolCall(**tool_call) for tool_call in message.get("tool_calls", [])],
+                finish_reason=first_choice.get("finish_reason", ""),
             ),
         )
 
