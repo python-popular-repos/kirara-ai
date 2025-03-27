@@ -12,6 +12,7 @@ class MediaMetadata(BaseModel):
     upload_time: datetime  # 上传时间
     source: Optional[str] = None  # 来源
     tags: List[str] = []  # 标签
+    references: List[str] = []
 
 
 class MediaItem(BaseModel):
