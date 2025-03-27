@@ -156,10 +156,11 @@ jobs:
                       "message": message
                   })
           
-          # 过滤掉不在PR变更文件中的错误
+          # 过滤掉不在PR变更文件中的错误，使用标准化路径和精确匹配来避免伪阳性错误
           changed_files = os.environ.get('CHANGED_FILES', '').split()
           if changed_files:
-              mypy_results = [error for error in mypy_results if any(error.get('file', '').endswith(f) for f in changed_files)]
+              normalized_changed_files = [os.path.normpath(f) for f in changed_files]
+              mypy_results = [error for error in mypy_results if os.path.normpath(error.get('file', '')) in normalized_changed_files]
           
           # 只保留diff中的错误
           review_comments = []
