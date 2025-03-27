@@ -88,17 +88,21 @@ jobs:
               file_path = result.get("file", "unknown")
               errors_by_file[file_path].append(result)
           
-          # 创建 issue 内容
+          # 创建 issue 标题
           issue_title = f"mypy 类型检查发现了 {len(mypy_results)} 个问题 ({sha})"
           
+          with open("issue_title.txt", "w", encoding="utf-8") as f:
+              f.write(issue_title)
+          
+          # 创建 issue 内容
           issue_body = f"""## mypy 类型检查报告
           
           **时间**: {now}  
           **Commit**: {sha}  
           **工作流**: [查看运行详情](https://github.com/{repo}/actions/runs/{run_id})
-          
+                    
           mypy 共发现 {len(mypy_results)} 个类型问题:
-          
+                    
           """
           
           # 添加每个文件的问题摘要
@@ -120,15 +124,15 @@ jobs:
                   line = error.get("line", "-")
                   column = error.get("column", "-")
                   error_code = error.get("code", "未知")
-                  message = error.get("message", "").replace("|", "\\|")
+                  message = error.get("message", "").replace("|", "\\|")  # 转义管道符号，避免破坏表格
                   
                   issue_body += f"| {line} | {column} | `{error_code}` | {message} |\n"
               
               issue_body += "\n"
           
           # 将内容写入文件，供 GitHub Action 使用
-          with open("mypy_issue.md", "w", encoding="utf-8") as f:
-              f.write(issue_title + "\n\n" + issue_body)
+          with open("issue_body.md", "w", encoding="utf-8") as f:
+              f.write(issue_body)
               
           print(f"成功创建 mypy 问题报告，共 {len(mypy_results)} 个问题")
           EOF
@@ -139,8 +143,8 @@ jobs:
         if: always()
         uses: peter-evans/create-issue-from-file@v4
         with:
-          title-filepath: ./mypy_issue.md
-          body-filepath: ./mypy_issue.md
+          title: $(cat issue_title.txt)
+          content-filepath: ./issue_body.md
           labels: |
             type-check
             automated-report
