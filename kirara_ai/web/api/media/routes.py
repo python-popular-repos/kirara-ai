@@ -64,7 +64,8 @@ def _convert_media_to_api_item(media: Media) -> Optional[MediaItem]:
             size=metadata.size or 0,
             upload_time=metadata.created_at,
             source=metadata.source,
-            tags=metadata.tags
+            tags=metadata.tags,
+            references=metadata.references or []
         )
     )
 

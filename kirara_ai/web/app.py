@@ -15,6 +15,7 @@ from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import HypercornLoggerWrapper, get_logger
 from kirara_ai.web.auth.services import AuthService, FileBasedAuthService
+from kirara_ai.web.utils import create_no_cache_response
 
 from .api.block import block_bp
 from .api.dispatch import dispatch_bp
@@ -124,18 +125,25 @@ def create_app(container: DependencyContainer) -> FastAPI:
     
     
     # 自定义静态资源处理
-    async def serve_custom_static(path: str):
+    async def serve_custom_static(path: str, request: Request):
         if path not in custom_static_assets:
             raise HTTPException(status_code=404, detail="File not found")
-        return FileResponse(custom_static_assets[path])
+        
+        file_path = Path(custom_static_assets[path])
+        try:
+            return await create_no_cache_response(file_path, request)
+        except Exception as e:
+            logger.error(f"处理自定义静态资源时出错: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
     @app.get("/")
-    async def index():
+    async def index(request: Request):
         try:
             index_path = Path(STATIC_FOLDER) / "index.html"
             if not index_path.exists():
                 return HTMLResponse(content=ERROR_MESSAGE.replace("TARGET_DIR", STATIC_FOLDER))
-            return FileResponse(index_path)
+            
+            return await create_no_cache_response(index_path, request)
         except Exception as e:
             logger.error(f"Error serving index: {e}")
             return HTMLResponse(content=ERROR_MESSAGE.replace("TARGET_DIR", STATIC_FOLDER))
@@ -145,7 +153,7 @@ def create_app(container: DependencyContainer) -> FastAPI:
         path = request.url.path    
         # 如果请求路径在自定义静态资源列表中，则返回自定义静态资源
         if path in custom_static_assets:
-            return await serve_custom_static(path)
+            return await serve_custom_static(path, request)
         
         skip_paths = [route.path for route in app.routes]
  
@@ -164,14 +172,22 @@ def create_app(container: DependencyContainer) -> FastAPI:
         if not file_path.resolve().is_relative_to(Path(STATIC_FOLDER).resolve()):
             raise HTTPException(status_code=404, detail="Access denied")
         
-        # 如果文件存在，返回文件
+        # 如果文件存在，返回文件并禁止缓存
         if file_path.is_file():
-            return FileResponse(file_path)
+            try:
+                return await create_no_cache_response(file_path, request)
+            except Exception as e:
+                logger.error(f"处理静态文件时出错: {e}")
+                return FileResponse(file_path)  # 退回到普通文件响应
         
         fallback_path = Path(STATIC_FOLDER) / "index.html"
         # 否则返回 index.html（SPA 路由）
         if fallback_path.is_file():
-            return FileResponse(fallback_path)
+            try:
+                return await create_no_cache_response(fallback_path, request)
+            except Exception as e:
+                logger.error(f"处理index.html时出错: {e}")
+                return FileResponse(fallback_path)  # 退回到普通文件响应
         else:
             return PlainTextResponse(status_code=404, content="route not found")            
     
