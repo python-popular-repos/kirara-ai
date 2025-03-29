@@ -108,9 +108,7 @@ class LLMRequestTrace(TraceRecord):
     @property
     def request(self) -> Optional[Dict[str, Any]]:
         """获取请求内容"""
-        if self.request_json:
-            return json.loads(self.request_json)
-        return None
+        return json.loads(self.request_json) if self.request_json else None
     
     @request.setter
     def request(self, value: Any):
@@ -121,9 +119,7 @@ class LLMRequestTrace(TraceRecord):
     @property
     def response(self) -> Optional[Dict[str, Any]]:
         """获取响应内容"""
-        if self.response_json:
-            return json.loads(self.response_json)
-        return None
+        return json.loads(self.response_json) if self.response_json else None
     
     @response.setter
     def response(self, value: Any):

@@ -194,11 +194,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         if not self.config.tracing.llm_tracing_content:
             event.request.messages = UNRECORD_REQUEST
             event.response.message = UNRECORD_RESPONSE
-        # 更新数据库记录
-        trace = self.update_trace_record(event.trace_id, event)
-
-        # 广播WebSocket消息
-        if trace:
+        if trace := self.update_trace_record(event.trace_id, event):
             self.broadcast_ws_message({
                 "type": "update",
                 "data": trace

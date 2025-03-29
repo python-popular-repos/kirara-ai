@@ -68,27 +68,23 @@ class TracingManager:
     # WebSocket相关方法
     def register_ws_client(self, tracer_name: str) -> asyncio.Queue:
         """为指定追踪器注册WebSocket客户端"""
-        tracer = self.tracers.get(tracer_name)
-        if tracer:
+        if tracer := self.tracers.get(tracer_name):
             return tracer.register_ws_client()
         
     def unregister_ws_client(self, tracer_name: str, queue: asyncio.Queue):
         """从指定追踪器注销WebSocket客户端"""
-        tracer = self.tracers.get(tracer_name)
-        if tracer:
+        if tracer := self.tracers.get(tracer_name):
             tracer.unregister_ws_client(queue)
 
     # 通用追踪操作方法
     def get_recent_traces(self, tracer_name: str, limit: int = 100) -> List[TraceRecord]:
         """获取指定追踪器的最近追踪记录"""
-        tracer = self.get_tracer(tracer_name)
-        if tracer:
+        if tracer := self.get_tracer(tracer_name):
             return tracer.get_recent_traces(limit)
         return []
 
     def get_trace_by_id(self, tracer_name: str, trace_id: str) -> Optional[TraceRecord]:
         """获取指定追踪器的特定追踪记录"""
-        tracer = self.get_tracer(tracer_name)
-        if tracer:
+        if tracer := self.get_tracer(tracer_name):
             return tracer.get_trace_by_id(trace_id)
         return None

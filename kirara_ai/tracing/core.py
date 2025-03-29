@@ -168,8 +168,11 @@ class TracerBase(Generic[R], abc.ABC):
     def update_trace_record(self, trace_id: str, event: TraceEvent) -> Optional[Dict[str, Any]]:
         """更新追踪记录"""
         with self.db_manager.get_session() as session:
-            record = session.query(self.record_class).filter_by(trace_id=trace_id).first()
-            if record:
+            if (
+                record := session.query(self.record_class)
+                .filter_by(trace_id=trace_id)
+                .first()
+            ):
                 record.update_from_event(event)
                 session.commit()
                 return record.to_dict()

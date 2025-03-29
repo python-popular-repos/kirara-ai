@@ -137,8 +137,7 @@ async def tracing_ws():
 
     # 订阅
     if cmd.get("action") == "subscribe":
-        tracer_type = cmd.get("tracer_type")
-        if tracer_type:
+        if tracer_type := cmd.get("tracer_type"):
             tracer = tracing_manager.get_tracer(tracer_type)
             if tracer:
                 # 注册WebSocket客户端
