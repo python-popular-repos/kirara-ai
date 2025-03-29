@@ -1,5 +1,5 @@
 from .base import TraceCompleteEvent, TraceEvent, TraceFailEvent, TraceStartEvent
-from .llm import LLMRequestStartEvent
+from .llm import LLMRequestCompleteEvent, LLMRequestFailEvent, LLMRequestStartEvent
 
 __all__ = [
     "TraceEvent",
@@ -7,4 +7,6 @@ __all__ = [
     "TraceCompleteEvent",
     "TraceFailEvent",
     "LLMRequestStartEvent",
+    "LLMRequestCompleteEvent",
+    "LLMRequestFailEvent",
 ]

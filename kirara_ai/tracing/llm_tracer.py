@@ -23,6 +23,40 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
     @Inject()
     def __init__(self, container: DependencyContainer):
         super().__init__(container, record_class=LLMRequestTrace)
+        
+    def initialize(self):
+        """启动追踪器，将所有 pending 状态的任务转为 failed，并清理超过 30 天的请求"""
+        super().initialize()
+        
+        try:
+            pending_traces = self._mark_pending_as_failed()
+            deleted_count = self._clean_old_traces()
+            if pending_traces or deleted_count:
+                self.logger.info(f"已将 {pending_traces} 个 未结束状态的 LLM 请求标记为失败，并清理了 {deleted_count} 个超过 30 天的请求记录")
+        except Exception as e:
+            self.logger.opt(exception=e).error(f"处理历史追踪记录时发生错误")
+
+    def _mark_pending_as_failed(self) -> int:
+        """将所有 pending 状态的任务转为 failed"""
+        with self.db_manager.get_session() as session:
+            pending_traces = session.query(LLMRequestTrace).filter(
+                LLMRequestTrace.status == "pending"
+            ).all()
+            for trace in pending_traces:
+                trace.status = "failed"
+                trace.error = "Incomplete request"
+            session.commit()
+            return len(pending_traces)
+            
+    def _clean_old_traces(self, days: int = 30) -> int:
+        """清理超过指定天数的请求"""
+        with self.db_manager.get_session() as session:
+            days_ago = datetime.now() - timedelta(days=days)
+            deleted_count = session.query(LLMRequestTrace).filter(
+                LLMRequestTrace.request_time < days_ago
+            ).delete()
+            session.commit()
+            return deleted_count
 
     def _register_event_handlers(self):
         """注册事件处理程序"""
