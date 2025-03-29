@@ -45,7 +45,9 @@ dependencies = [
     "python-magic-bin ; platform_system == 'Windows'",
     "ymbotpy",
     "Pillow",
-    "pytz"
+    "pytz",
+    "sqlalchemy",
+    "alembic"
 ]
 
 

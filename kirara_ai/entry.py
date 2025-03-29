@@ -7,6 +7,7 @@ from packaging import version
 
 from kirara_ai.config.config_loader import ConfigLoader
 from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.database import DatabaseManager
 from kirara_ai.events.application import ApplicationStarted, ApplicationStopping
 from kirara_ai.events.event_bus import EventBus
 from kirara_ai.im.im_registry import IMRegistry
@@ -22,6 +23,7 @@ from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomp
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.scopes import GlobalScope, GroupScope, MemberScope
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
+from kirara_ai.tracing import LLMTracer, TracingManager
 from kirara_ai.web.api.system.utils import get_installed_version, get_latest_pypi_version
 from kirara_ai.web.app import WebServer
 from kirara_ai.workflow.core.block import BlockRegistry
@@ -49,7 +51,7 @@ async def check_update():
 def _signal_handler(*args):
     global _interrupt_count
     _interrupt_count += 1
-    
+
     if _interrupt_count == 1:
         if not shutdown_event.is_set():
             logger.warning("Interrupt signal received. Stopping application...")
@@ -90,10 +92,29 @@ def init_media_carrier(container: DependencyContainer):
     carrier_registry = container.resolve(MediaCarrierRegistry)
     carrier_registry.register("memory", container.resolve(MemoryManager))
 
+def init_tracing_system(container: DependencyContainer):
+    """初始化追踪系统"""
+    logger.info("Initializing tracing system...")
+
+    # 初始化追踪管理器
+    tracing_manager = TracingManager(container)
+    container.register(TracingManager, tracing_manager)
+
+    # 创建并注册LLM追踪器
+    llm_tracer = LLMTracer(container)
+    container.register(LLMTracer, llm_tracer)
+    tracing_manager.register_tracer("llm", llm_tracer)
+
+    # 初始化追踪系统
+    tracing_manager.initialize()
+
+    logger.info("Tracing system initialized")
+    return tracing_manager
+
 def init_application() -> DependencyContainer:
     """初始化应用程序"""
     logger.info("Initializing application...")
-        
+
     # 配置文件路径
     config_path = "./data/config.yaml"
 
@@ -103,7 +124,7 @@ def init_application() -> DependencyContainer:
     if not os.path.exists("./data"):
         os.makedirs("./data")
     if os.path.exists(config_path):
-        config = ConfigLoader.load_config(config_path, GlobalConfig)
+        config: GlobalConfig = ConfigLoader.load_config(config_path, GlobalConfig)
         logger.info("Configuration loaded successfully")
     else:
         logger.warning(
@@ -113,7 +134,7 @@ def init_application() -> DependencyContainer:
             "Please create a configuration file by copying config.yaml.example to config.yaml and modify it according to your needs"
         )
         config = GlobalConfig()
-        
+
     # 设置时区
     os.environ["TZ"] = config.system.timezone
     if hasattr(time, "tzset"):
@@ -122,16 +143,21 @@ def init_application() -> DependencyContainer:
     container = init_container()
     container.register(asyncio.AbstractEventLoop, asyncio.new_event_loop())
     container.register(EventBus, EventBus())
-    
+
     container.register(GlobalConfig, config)
     container.register(BlockRegistry, BlockRegistry())
-    
+
+    # 初始化数据库管理器
+    db = DatabaseManager(container)
+    db.initialize()
+    container.register(DatabaseManager, db)
+
     # 注册媒体管理器
     media_manager = MediaManager()
     container.register(MediaManager, media_manager)
     container.register(MediaCarrierRegistry, MediaCarrierRegistry(container))
     container.register(MediaCarrierService, MediaCarrierService(container, media_manager))
-    
+
     # 注册工作流注册表
     workflow_registry = WorkflowRegistry(container)
     container.register(WorkflowRegistry, workflow_registry)
@@ -153,14 +179,17 @@ def init_application() -> DependencyContainer:
 
     workflow_dispatcher = WorkflowDispatcher(container)
     container.register(WorkflowDispatcher, workflow_dispatcher)
-    
+
     container.register(WebServer, WebServer(container))
 
     # 初始化记忆系统
     logger.info("Initializing memory system...")
     init_memory_system(container)
-    
+
     init_media_carrier(container)
+
+    # 初始化追踪系统
+    init_tracing_system(container)
 
     # 注册系统 blocks
     register_system_blocks(container.resolve(BlockRegistry))
@@ -191,27 +220,27 @@ def init_application() -> DependencyContainer:
 def run_application(container: DependencyContainer):
     """运行应用程序"""
     loop = container.resolve(asyncio.AbstractEventLoop)
-        
+
     # 启动Web服务器
     logger.info("Starting web server...")
     web_server = container.resolve(WebServer)
     loop.run_until_complete(web_server.start())
-    
+
     # 启动插件
     plugin_loader = container.resolve(PluginLoader)
     plugin_loader.start_plugins()
-    
+
     # 启动适配器
     logger.info("Starting adapters")
     im_manager = container.resolve(IMManager)
     im_manager.start_adapters(loop=loop)
-    
+
     # 注册信号处理函数
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
     # 阻止信号处理函数被覆盖
     signal.signal = lambda *args: None
-    
+
     try:
         logger.success("Kirara AI 启动完毕，等待消息中...")
         logger.success(
@@ -229,6 +258,18 @@ def run_application(container: DependencyContainer):
         logger.info("Shutting down memory system...")
         memory_manager.shutdown()
 
+        # 关闭追踪系统
+        try:
+            tracing_manager = container.resolve(TracingManager)
+            logger.info("Shutting down tracing system...")
+            tracing_manager.shutdown()
+
+            db_manager = container.resolve(DatabaseManager)
+            logger.info("Shutting down database...")
+            db_manager.shutdown()
+        except Exception as e:
+            logger.error(f"Error shutting down tracing system: {e}")
+
         # 停止Web服务器
         logger.info("Stopping web server...")
 
@@ -242,7 +283,7 @@ def run_application(container: DependencyContainer):
             plugin_loader.stop_plugins()
         except Exception as e:
             logger.error(f"Error stopping adapters: {e}")
-        
+
         # 关闭事件循环
         loop.stop()
         logger.info("Application stopped gracefully")

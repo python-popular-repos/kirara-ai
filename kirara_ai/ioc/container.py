@@ -31,6 +31,9 @@ class DependencyContainer:
         else:
             raise KeyError(f"Dependency {key} not found.")
 
+    def has(self, key: Type[T] | Any) -> bool:
+        return key in self.registry or (self.parent and self.parent.has(key))
+
     def scoped(self):
         """创建一个新的作用域容器"""
         new_container = ScopedContainer(self)

@@ -22,3 +22,4 @@ build/
 /web/
 botpy.log*
 data/frpc/
+data/db/

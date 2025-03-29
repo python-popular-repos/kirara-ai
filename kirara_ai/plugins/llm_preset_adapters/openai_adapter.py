@@ -10,6 +10,7 @@ from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
+from kirara_ai.tracing import trace_llm_chat
 
 logger = get_logger("OpenAIAdapter")
 
@@ -44,7 +45,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     
     def __init__(self, config: OpenAIConfig):
         self.config = config
-
+    @trace_llm_chat
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
         api_url = f"{self.config.api_base}/chat/completions"
         headers = {

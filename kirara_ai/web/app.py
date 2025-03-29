@@ -24,6 +24,7 @@ from .api.llm import llm_bp
 from .api.media import media_bp
 from .api.plugin import plugin_bp
 from .api.system import system_bp
+from .api.tracing import tracing_bp
 from .api.workflow import workflow_bp
 from .auth.routes import auth_bp
 
@@ -62,13 +63,13 @@ STATIC_FOLDER = f"{cwd}/web"
 
 logger = get_logger("WebServer")
 
-custom_static_assets = {}
+custom_static_assets: dict[str, str] = {}
 
 def create_web_api_app(container: DependencyContainer) -> Quart:
     """创建 Web API 应用（Quart）"""
     app = Quart(__name__, static_folder=STATIC_FOLDER)
     app.json.sort_keys = False
-    
+
     # 注册蓝图
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(im_bp, url_prefix="/api/im")
@@ -79,7 +80,8 @@ def create_web_api_app(container: DependencyContainer) -> Quart:
     app.register_blueprint(plugin_bp, url_prefix="/api/plugin")
     app.register_blueprint(system_bp, url_prefix="/api/system")
     app.register_blueprint(media_bp, url_prefix="/api/media")
-    
+    app.register_blueprint(tracing_bp, url_prefix="/api/tracing")
+
     @app.errorhandler(Exception)
     def handle_exception(error):
         logger.opt(exception=error).error("Error during request")
@@ -91,19 +93,19 @@ def create_web_api_app(container: DependencyContainer) -> Quart:
     @app.before_request
     async def inject_container():
         g.container = container
-        
+
     @app.before_websocket
     async def inject_container():
         g.container = container
 
     app.container = container
-    
+
     return app
 
 def create_app(container: DependencyContainer) -> FastAPI:
     """创建主应用（FastAPI）"""
     app = FastAPI()
-    
+
     # 配置 CORS
     app.add_middleware(
         CORSMiddleware,
@@ -112,7 +114,7 @@ def create_app(container: DependencyContainer) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # 强制设置 MIME 类型
     mimetypes.add_type("text/html", ".html")
     mimetypes.add_type("text/css", ".css")
@@ -122,27 +124,27 @@ def create_app(container: DependencyContainer) -> FastAPI:
     mimetypes.add_type("image/jpeg", ".jpg")
     mimetypes.add_type("image/gif", ".gif")
     mimetypes.add_type("image/webp", ".webp")
-    
-    
+
+
     # 自定义静态资源处理
     async def serve_custom_static(path: str, request: Request):
         if path not in custom_static_assets:
             raise HTTPException(status_code=404, detail="File not found")
-        
+
         file_path = Path(custom_static_assets[path])
         try:
             return await create_no_cache_response(file_path, request)
         except Exception as e:
             logger.error(f"处理自定义静态资源时出错: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
-    
+
     @app.get("/")
     async def index(request: Request):
         try:
             index_path = Path(STATIC_FOLDER) / "index.html"
             if not index_path.exists():
                 return HTMLResponse(content=ERROR_MESSAGE.replace("TARGET_DIR", STATIC_FOLDER))
-            
+
             return await create_no_cache_response(index_path, request)
         except Exception as e:
             logger.error(f"Error serving index: {e}")
@@ -150,19 +152,19 @@ def create_app(container: DependencyContainer) -> FastAPI:
 
     @app.middleware("http")
     async def spa_middleware(request: Request, call_next):
-        path = request.url.path    
+        path = request.url.path
         # 如果请求路径在自定义静态资源列表中，则返回自定义静态资源
         if path in custom_static_assets:
             return await serve_custom_static(path, request)
-        
+
         skip_paths = [route.path for route in app.routes]
- 
+
         # 如果路径在跳过路径列表中，则直接返回
         if any(path == skip_path for skip_path in skip_paths):
             return await call_next(request)
-        
+
         skip_paths.remove("/")
-        
+
         # 如果路径以 backend-api 开头，交由内置路由处理
         if any(path.startswith(skip_path) for skip_path in skip_paths):
             return await call_next(request)
@@ -171,7 +173,7 @@ def create_app(container: DependencyContainer) -> FastAPI:
         # 检查路径穿越
         if not file_path.resolve().is_relative_to(Path(STATIC_FOLDER).resolve()):
             raise HTTPException(status_code=404, detail="Access denied")
-        
+
         # 如果文件存在，返回文件并禁止缓存
         if file_path.is_file():
             try:
@@ -179,7 +181,7 @@ def create_app(container: DependencyContainer) -> FastAPI:
             except Exception as e:
                 logger.error(f"处理静态文件时出错: {e}")
                 return FileResponse(file_path)  # 退回到普通文件响应
-        
+
         fallback_path = Path(STATIC_FOLDER) / "index.html"
         # 否则返回 index.html（SPA 路由）
         if fallback_path.is_file():
@@ -189,15 +191,15 @@ def create_app(container: DependencyContainer) -> FastAPI:
                 logger.error(f"处理index.html时出错: {e}")
                 return FileResponse(fallback_path)  # 退回到普通文件响应
         else:
-            return PlainTextResponse(status_code=404, content="route not found")            
-    
+            return PlainTextResponse(status_code=404, content="route not found")
+
     return app
 
 
 class WebServer:
     app: FastAPI
     web_api_app: Quart
-    
+
     def __init__(self, container: DependencyContainer):
         self.app = create_app(container)
         self.web_api_app = create_web_api_app(container)
@@ -218,7 +220,7 @@ class WebServer:
         self.hypercorn_config = Config()
         self.hypercorn_config.bind = [f"{self.config.web.host}:{self.config.web.port}"]
         self.hypercorn_config._log = Logger(self.hypercorn_config)
-        
+
         # 创建自定义的日志包装器，添加 URL 过滤
         class FilteredLoggerWrapper(HypercornLoggerWrapper):
             def info(self, message, *args, **kwargs):
@@ -231,11 +233,11 @@ class WebServer:
                     if path in str(args):
                         return
                 super().info(message, *args, **kwargs)
-        
+
         # 使用新的过滤日志包装器
         self.hypercorn_config._log.access_logger = FilteredLoggerWrapper(logger)
         self.hypercorn_config._log.error_logger = HypercornLoggerWrapper(logger)
-        
+
         # 挂载 Web API 应用
         self.mount_app("/backend-api", self.web_api_app)
 
@@ -259,7 +261,7 @@ class WebServer:
             error_msg = f"端口 {self.config.web.port} 已被占用，无法启动服务器，请修改端口或关闭其他占用端口的程序。"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
-            
+
         self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait))
         logger.info(
             f"监听地址：http://{self.config.web.host}:{self.config.web.port}/"
@@ -268,7 +270,7 @@ class WebServer:
     async def stop(self):
         """停止Web服务器"""
         self.shutdown_event.set()
-        
+
         if self.server_task:
             try:
                 await asyncio.wait_for(self.server_task, timeout=3.0)
@@ -280,4 +282,9 @@ class WebServer:
                 logger.error(f"Error during server shutdown: {e}")
 
     def add_static_assets(self, url_path: str, local_path: str):
+        """添加自定义静态资源"""
+        if not os.path.exists(local_path):
+            logger.warning(f"Static asset path does not exist: {local_path}")
+            return
+
         custom_static_assets[url_path] = local_path
