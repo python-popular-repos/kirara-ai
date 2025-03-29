@@ -2,7 +2,9 @@ name: Project Check
 
 on:
   push:
+    branches: [ "master" ]
   merge_group:
+    branches: [ "master" ]
 
 jobs:
   analyze:
@@ -11,7 +13,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      issues: write  # 需要写入 issues 的权限
+      issues: write
 
     strategy:
       fail-fast: false
@@ -33,14 +35,12 @@ jobs:
           python -m pip install .
           python -m pip install mypy types-requests types-setuptools
 
-      # Type checking with mypy
       - name: Run mypy
         run: |
           mypy --python-version 3.10 --show-column-numbers --show-error-codes --ignore-missing-imports kirara_ai --output json > mypy_output.json
         continue-on-error: true
 
-      # 创建 Issue 而不是转换为 SARIF
-      - name: Create issue from mypy results
+      - name: Create mypy issue content
         if: always()
         run: |
           cat > create_mypy_issue.py << 'EOF'
@@ -79,25 +79,41 @@ jobs:
           run_id = os.environ.get("GITHUB_RUN_ID", "")
           sha = os.environ.get("GITHUB_SHA", "")[:7]
           
+          # 获取分支信息
+          ref_name = os.environ.get("GITHUB_REF_NAME", "")
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          
+          if event_name == "merge_group":
+              branch_info = f"合并到 {ref_name} 分支"
+          else:
+              branch_info = f"{ref_name} 分支"
+          
           # 格式化当前时间
           now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
           
           # 按文件分组错误
           errors_by_file = defaultdict(list)
+          # 按错误类型分组
+          errors_by_type = defaultdict(int)
+          
           for result in mypy_results:
               file_path = result.get("file", "unknown")
+              error_code = result.get("code", "未知")
               errors_by_file[file_path].append(result)
+              errors_by_type[error_code] += 1
           
           # 创建 issue 标题
-          issue_title = f"mypy 类型检查发现了 {len(mypy_results)} 个问题 ({sha})"
+          issue_title = f"对{branch_info}的类型检查发现了 {len(mypy_results)} 个问题 ({sha})"
           
-          with open("issue_title.txt", "w", encoding="utf-8") as f:
-              f.write(issue_title)
+          # 直接设置环境变量而不是写入文件
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"ISSUE_TITLE={issue_title}\n")
           
           # 创建 issue 内容
           issue_body = f"""## mypy 类型检查报告
           
           **时间**: {now}  
+          **分支**: {branch_info}  
           **Commit**: {sha}  
           **工作流**: [查看运行详情](https://github.com/{repo}/actions/runs/{run_id})
                     
@@ -105,22 +121,34 @@ jobs:
                     
           """
           
+          # 添加错误类型统计
+          issue_body += "### 错误类型统计\n\n"
+          issue_body += "| 错误代码 | 出现次数 | 占比 |\n"
+          issue_body += "| -------- | -------- | ---- |\n"
+          for error_code, count in sorted(errors_by_type.items(), key=lambda x: x[1], reverse=True):
+              percentage = (count / len(mypy_results)) * 100
+              issue_body += f"| `{error_code}` | {count} | {percentage:.1f}% |\n"
+          
           # 添加每个文件的问题摘要
-          issue_body += "### 问题摘要\n\n"
-          issue_body += "| 文件 | 问题数量 |\n"
-          issue_body += "| ---- | -------- |\n"
-          for file_path, errors in errors_by_file.items():
-              issue_body += f"| `{file_path}` | {len(errors)} |\n"
+          issue_body += "\n### 问题摘要\n\n"
+          issue_body += "| 文件 | 问题数量 | 详情 |\n"
+          issue_body += "| ---- | -------- | ---- |\n"
+          for file_path, errors in sorted(errors_by_file.items(), key=lambda x: len(x[1]), reverse=True):
+              file_short = file_path.split("/")[-1]
+              issue_body += f"| `{file_path}` | {len(errors)} | [查看详情](#file-{file_short.replace('.', '-')}) |\n"
           
           issue_body += "\n### 详细问题\n\n"
           
           # 添加每个文件的详细问题
-          for file_path, errors in errors_by_file.items():
+          for file_path, errors in sorted(errors_by_file.items(), key=lambda x: x[0]):
+              file_short = file_path.split("/")[-1]
+              issue_body += f"<a id=\"file-{file_short.replace('.', '-')}\"></a>\n"
               issue_body += f"#### {file_path}\n\n"
               issue_body += "| 行号 | 列号 | 错误代码 | 错误消息 |\n"
               issue_body += "| ---- | ---- | -------- | -------- |\n"
               
-              for error in errors:
+              # 按行号排序错误
+              for error in sorted(errors, key=lambda x: (x.get("line", 0), x.get("column", 0))):
                   line = error.get("line", "-")
                   column = error.get("column", "-")
                   error_code = error.get("code", "未知")
@@ -143,7 +171,7 @@ jobs:
         if: always()
         uses: peter-evans/create-issue-from-file@v4
         with:
-          title: $(cat issue_title.txt)
+          title: ${{ env.ISSUE_TITLE }}
           content-filepath: ./issue_body.md
           labels: |
             type-check
