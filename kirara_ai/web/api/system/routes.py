@@ -82,6 +82,9 @@ async def get_system_config():
             },
             "system": {
                 "timezone": config.system.timezone
+            },
+            "tracing": {
+                "llm_tracing_content": config.tracing.llm_tracing_content
             }
         }
     except Exception as e:
@@ -165,6 +168,23 @@ async def update_system_config():
         return {"status": "success"}
     except Exception as e:
         return {"error": str(e)}, 500
+    
+@system_bp.route("/config/tracing", methods=["POST"])
+@require_auth
+async def update_tracing_config():
+    """更新追踪配置"""
+    try:
+        data = await request.get_json()
+        config: GlobalConfig = g.container.resolve(GlobalConfig)
+        
+        config.tracing.llm_tracing_content = data["llm_tracing_content"]
+        
+        # 保存配置
+        ConfigLoader.save_config_with_backup(CONFIG_FILE, config)
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 
 @system_bp.route("/status", methods=["GET"])
 @require_auth

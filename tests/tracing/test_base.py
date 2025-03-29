@@ -4,7 +4,9 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy import Column, Integer
 
+from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.database import DatabaseManager
+from kirara_ai.database.manager import Base
 from kirara_ai.events.event_bus import EventBus
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.format.message import LLMChatMessage, LLMChatTextContent
@@ -41,10 +43,12 @@ class TracingTestBase(unittest.TestCase):
         self.container.register(DependencyContainer, self.container)
         self.event_bus = EventBus()
         self.container.register(EventBus, self.event_bus)
+        self.container.register(GlobalConfig, GlobalConfig())
         
         # 使用内存数据库进行测试
         self.db_manager = DatabaseManager(self.container, database_url="sqlite:///:memory:", is_debug=True)
         self.db_manager.initialize()
+        Base.metadata.create_all(self.db_manager.engine)
         self.container.register(DatabaseManager, self.db_manager)
 
     def tearDown(self):

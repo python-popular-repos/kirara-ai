@@ -3,9 +3,11 @@ from typing import Any, Dict
 
 from sqlalchemy import case, func
 
+from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.events.tracing import LLMRequestCompleteEvent, LLMRequestFailEvent, LLMRequestStartEvent
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.ioc.inject import Inject
+from kirara_ai.llm.format.message import LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.logger import get_logger
@@ -13,6 +15,24 @@ from kirara_ai.tracing.core import TracerBase, generate_trace_id
 from kirara_ai.tracing.models import LLMRequestTrace
 
 logger = get_logger("LLMTracer")
+
+UNRECORD_REQUEST = [LLMChatMessage(
+    role="system",
+    content=[
+        LLMChatTextContent(
+            text="*** 内容未记录 ***"
+        )
+    ]
+)]
+
+UNRECORD_RESPONSE = LLMChatMessage(
+    role="assistant",
+    content=[
+        LLMChatTextContent(
+            text="*** 内容未记录 ***"
+        )
+    ]
+)
 
 class LLMTracer(TracerBase[LLMRequestTrace]):
     """LLM追踪器，负责处理LLM请求的跟踪"""
@@ -23,6 +43,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
     @Inject()
     def __init__(self, container: DependencyContainer):
         super().__init__(container, record_class=LLMRequestTrace)
+        self.config = container.resolve(GlobalConfig)
         
     def initialize(self):
         """启动追踪器，将所有 pending 状态的任务转为 failed，并清理超过 30 天的请求"""
@@ -81,7 +102,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
             trace_id=trace_id,
             model_id=request.model or 'unknown',
             backend_name=backend_name,
-            request=request
+            request=request.model_copy(deep=True)
         )
         # 存储活跃追踪信息
         self._active_traces[trace_id] = {
@@ -90,7 +111,6 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         }
         # 发布事件
         self.event_bus.post(event)
-        self.logger.debug(f"LLM request started: {trace_id}")
         return trace_id
 
     def complete_request_tracking(
@@ -106,21 +126,18 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
             backend_name = trace_data.get('backend_name', "unknown")
             start_time = trace_data.get('start_time', 0)
 
-            self.logger.debug(f"LLM request completed: {trace_id}")
             event = LLMRequestCompleteEvent(
                 trace_id=trace_id,
                 model_id=model_id,
                 backend_name=backend_name,
-                request=request,
-                response=response,
+                request=request.model_copy(deep=True),
+                response=response.model_copy(deep=True),
                 start_time=start_time
             )
             # 移除活跃追踪
             del self._active_traces[trace_id]
             # 发布事件
             self.event_bus.post(event)
-        else:
-            self.logger.warning(f"LLM request completed: {trace_id} not found")
 
     def fail_request_tracking(
         self,
@@ -140,7 +157,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
                 trace_id=trace_id,
                 model_id=model_id,
                 backend_name=backend_name,
-                request=request,
+                request=request.model_copy(deep=True),
                 error=error,
                 start_time=start_time
             )
@@ -154,6 +171,8 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
     def _on_request_start(self, event: LLMRequestStartEvent):
         """处理请求开始事件"""
         self.logger.debug(f"LLM request started: {event.trace_id}")
+        if not self.config.tracing.llm_tracing_content:
+            event.request.messages = UNRECORD_REQUEST
 
         # 创建数据库记录
         trace = LLMRequestTrace()
@@ -172,6 +191,9 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         """处理请求完成事件"""
         self.logger.debug(f"LLM request completed: {event.trace_id}")
 
+        if not self.config.tracing.llm_tracing_content:
+            event.request.messages = UNRECORD_REQUEST
+            event.response.message = UNRECORD_RESPONSE
         # 更新数据库记录
         trace = self.update_trace_record(event.trace_id, event)
 
@@ -185,6 +207,9 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
     def _on_request_fail(self, event: LLMRequestFailEvent):
         """处理请求失败事件"""
         self.logger.debug(f"LLM request failed: {event.trace_id}")
+        
+        if not self.config.tracing.llm_tracing_content:
+            event.request.messages = UNRECORD_REQUEST
 
         # 更新数据库记录
         trace = self.update_trace_record(event.trace_id, event)

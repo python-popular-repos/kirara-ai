@@ -94,7 +94,8 @@ class LLMRequestTrace(TraceRecord):
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
             "cached_tokens": self.cached_tokens,
-            "status": self.status
+            "status": self.status,
+            "error": self.error
         }
     
     def to_detail_dict(self) -> Dict[str, Any]:
