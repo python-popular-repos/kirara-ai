@@ -174,6 +174,13 @@ class MediaMessage(MessageElement):
             
         raise ValueError("Failed to get media data")
     
+    def get_base64_url(self) -> str:
+        """获取媒体资源的Base64 URL"""
+        if not self.media_id:
+            raise ValueError("Media not registered")
+            
+        return self._media_manager.get_base64_url(self.media_id)
+    
     def get_description(self) -> str:
         """获取媒体资源的描述"""
         metadata = self._media_manager.get_metadata(self.media_id)
@@ -420,6 +427,7 @@ VoiceElement = VoiceMessage
 VideoElement = VideoMessage
 EmojiElement = EmojiMessage
 JsonElement = JsonMessage
+FaceElement = EmojiMessage
 
 # 示例用法
 if __name__ == "__main__":
