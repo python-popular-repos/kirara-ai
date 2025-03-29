@@ -3,10 +3,10 @@ import random
 from functools import lru_cache
 from typing import Optional
 
-from telegramify_markdown import markdownify
 from pydantic import BaseModel, ConfigDict, Field
 from telegram import Bot, Update, User
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegramify_markdown import markdownify
 
 from kirara_ai.im.adapter import BotProfileAdapter, EditStateAdapter, IMAdapter, UserProfileAdapter
 from kirara_ai.im.message import ImageMessage, IMMessage, MentionElement, TextMessage, VoiceMessage
@@ -185,8 +185,7 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
                 # 如果是非首条消息，适当停顿，模拟打字
                 if message.message_elements.index(element) > 0:
                     # 停顿通常和字数有关，但是会带一些随机
-                    duration = len(element.text) * 0.1 + \
-                        random.uniform(0, 1) * 0.1
+                    duration = max(len(element.text) * 0.1, 1) + random.uniform(0, 1) * 0.1
                     await asyncio.sleep(duration)
                 await self.application.bot.send_message(
                     chat_id=chat_id, text=text, parse_mode="MarkdownV2"
