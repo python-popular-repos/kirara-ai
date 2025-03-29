@@ -82,17 +82,17 @@ class Inject:
         backing_name = f"_{name}_value"
         
         # 定义默认的 getter 方法 (使用实例属性存储值)
-        def default_fget(self):
-            return getattr(self, backing_name, None)
+        def default_fget(_self):
+            return getattr(_self, backing_name, None)
 
         # 定义默认的 setter 方法 (使用实例属性存储值)
-        def default_fset(self, value):
-            setattr(self, backing_name, value)
+        def default_fset(_self, value):
+            setattr(_self, backing_name, value)
 
         # 定义默认的 deleter 方法 (使用实例属性存储值)
-        def default_fdel(self):
-            if hasattr(self, backing_name):
-                delattr(self, backing_name)
+        def default_fdel(_self):
+            if hasattr(_self, backing_name):
+                delattr(_self, backing_name)
 
         # 如果已有属性，使用其方法，否则使用默认方法
         if prop:
@@ -112,7 +112,7 @@ class Inject:
                 # 如果返回值是一个类型，尝试从 container 中解析
                 return self.container.resolve(injecting_type)
             else:
-                return getattr(self, backing_name, None)
+                return default_fget(_self)
 
         # 返回新的 property
         return property(new_fget, fset, fdel)
