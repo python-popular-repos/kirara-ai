@@ -1,27 +1,26 @@
 import os
+import tempfile
 from unittest.mock import patch
 
-import aiohttp
 import pytest
 
-from kirara_ai.im.message import MediaMessage
+from kirara_ai.im.message import ImageMessage
+from kirara_ai.media.manager import MediaManager
 
 # 测试资源路径
 TEST_RESOURCE_PATH = os.path.join(os.path.dirname(__file__), "resources", "test_image.txt")
 TEST_URL = "https://httpbin.org/image/jpeg"  # 一个可用的测试图片URL
 
-# 创建测试用的具体子类
-class TestMediaMessage(MediaMessage):
-    __test__ = False
+temp_dir = tempfile.mkdtemp()
+media_dir = os.path.join(temp_dir, "media")
 
-    resource_type = "test"
-    def to_plain(self):
-        return "[TestMedia]"
+# 创建媒体管理器
+media_manager = MediaManager(media_dir=media_dir)
 
 @pytest.mark.asyncio
 async def test_media_element_from_path():
     # 测试从文件路径初始化
-    media = TestMediaMessage(path=TEST_RESOURCE_PATH)
+    media = ImageMessage(path=TEST_RESOURCE_PATH)
     
     # 测试获取数据
     data = await media.get_data()
@@ -41,7 +40,7 @@ async def test_media_element_from_path():
 @pytest.mark.asyncio
 async def test_media_element_from_url():
     # 测试从URL初始化
-    media = TestMediaMessage(url=TEST_URL)
+    media = ImageMessage(url=TEST_URL)
     
     # 测试获取数据
     data = await media.get_data()
@@ -67,7 +66,7 @@ async def test_media_element_from_data():
         test_data = f.read()
     
     # 测试从二进制数据初始化
-    media = TestMediaMessage(data=test_data, format="txt")
+    media = ImageMessage(data=test_data, format="txt")
     
     # 测试获取数据
     data = await media.get_data()
@@ -86,7 +85,7 @@ async def test_media_element_from_data():
 @pytest.mark.asyncio
 async def test_media_element_format_detection():
     # 测试格式自动检测
-    media = TestMediaMessage(path=TEST_RESOURCE_PATH)
+    media = ImageMessage(path=TEST_RESOURCE_PATH)
     await media.get_data()  # 触发格式检测
     assert media.format is not None
     assert media.resource_type is not None
@@ -95,14 +94,11 @@ async def test_media_element_format_detection():
 async def test_media_element_errors():
     # 测试错误情况
     with pytest.raises(ValueError):
-        TestMediaMessage()  # 没有提供任何参数
+        ImageMessage()  # 没有提供任何参数
         
     with pytest.raises(ValueError):
-        TestMediaMessage(data=b"test")  # 提供数据但没有格式
-        
-    with pytest.raises(aiohttp.ClientError):
         # 使用mock模拟网络请求失败
-        with patch('aiohttp.ClientSession.get') as mock_get:
-            mock_get.side_effect = aiohttp.ClientError("Mocked network error")
-            media = TestMediaMessage(url="https://valid-url-but-will-fail.com/image.jpg")
+        with patch('curl_cffi.AsyncSession.get') as mock_get:
+            mock_get.side_effect = ValueError("Mocked network error")
+            media = ImageMessage(url="https://valid-url-but-will-fail.com/image.jpg")
             await media.get_data()  # 模拟网络请求失败

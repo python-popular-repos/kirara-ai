@@ -18,8 +18,12 @@ class LLMResponseToText(Block):
 
     def execute(self, response: LLMChatResponse) -> Dict[str, Any]:
         content = ""
-        if response.choices and response.choices[0].message:
-            content = content +response.choices[0].message.content
+        if response.message:
+            for part in response.message.content:
+                if part.type == "text":
+                    content = content + part.text
+                elif part.type == "image":
+                    content = content + f"<media_msg id={part.media_id} />"
 
         return {"text": content}
 

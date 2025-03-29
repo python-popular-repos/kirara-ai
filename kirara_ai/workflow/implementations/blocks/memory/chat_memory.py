@@ -5,6 +5,7 @@ from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.logger import get_logger
+from kirara_ai.memory.composes.base import ComposableMessageType
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.registry import ComposerRegistry, DecomposerRegistry, ScopeRegistry
 from kirara_ai.workflow.core.block import Block, Input, Output, ParamMeta
@@ -13,6 +14,8 @@ from kirara_ai.workflow.core.block import Block, Input, Output, ParamMeta
 def scope_type_options_provider(container: DependencyContainer, block: Block) -> List[str]:
     return ["global", "member", "group"]
 
+def decomposer_name_options_provider(container: DependencyContainer, block: Block) -> List[str]:
+    return ["default", "multi_element"]
 
 class ChatMemoryQuery(Block):
     name = "chat_memory_query"
@@ -21,7 +24,7 @@ class ChatMemoryQuery(Block):
             "chat_sender", "聊天对象", ChatSender, "要查询记忆的聊天对象"
         )
     }
-    outputs = {"memory_content": Output("memory_content", "记忆内容", str, "记忆内容")}
+    outputs = {"memory_content": Output("memory_content", "记忆内容", List[ComposableMessageType], "记忆内容")}
     container: DependencyContainer
 
     def __init__(
@@ -34,8 +37,17 @@ class ChatMemoryQuery(Block):
                 options_provider=scope_type_options_provider,
             ),
         ],
+        decomposer_name: Annotated[
+            Optional[str],
+            ParamMeta(
+                label="解析器名称",
+                description="要使用的解析器名称",
+                options_provider=decomposer_name_options_provider,
+            ),
+        ] = "default",
     ):
         self.scope_type = scope_type
+        self.decomposer_name = decomposer_name
 
     def execute(self, chat_sender: ChatSender) -> Dict[str, Any]:
         self.memory_manager = self.container.resolve(MemoryManager)
@@ -50,8 +62,8 @@ class ChatMemoryQuery(Block):
 
         # 获取解析器实例
         decomposer_registry = self.container.resolve(DecomposerRegistry)
+        self.decomposer = decomposer_registry.get_decomposer(self.decomposer_name)
 
-        self.decomposer = decomposer_registry.get_decomposer("default")
         entries = self.memory_manager.query(self.scope, chat_sender)
         memory_content = self.decomposer.decompose(entries)
         return {"memory_content": memory_content}
@@ -108,8 +120,8 @@ class ChatMemoryStore(Block):
         else:
             composed_messages = [user_msg]
         if llm_resp is not None:
-            if llm_resp.choices and llm_resp.choices[0].message:
-                composed_messages.append(llm_resp.choices[0].message)
+            if llm_resp.message:
+                composed_messages.append(llm_resp.message)
         if not composed_messages:
             self.logger.warning("No messages to store")
             return {}

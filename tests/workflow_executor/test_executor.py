@@ -4,6 +4,7 @@ from kirara_ai.events.event_bus import EventBus
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.workflow.core.block import Block, Input, Output
 from kirara_ai.workflow.core.block.registry import BlockRegistry
+from kirara_ai.workflow.core.execution.exceptions import BlockExecutionFailedException
 from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 from kirara_ai.workflow.core.workflow import Wire, Workflow
 from tests.utils.test_block_registry import create_test_block_registry
@@ -62,7 +63,7 @@ class FailingBlock(Block):
     }
 
     def execute(self, input1: str, **kwargs):
-        raise RuntimeError("Test error")
+        raise BlockExecutionFailedException("Test error")
 
 
 # 注册测试用的 Block 类型
@@ -136,7 +137,7 @@ async def test_executor_with_failing_block():
     container.register(BlockRegistry, test_registry)
     container.register(Workflow, failing_workflow)
     executor = WorkflowExecutor(container)
-    with pytest.raises(RuntimeError, match="Block failing1 execution failed: Test error"):
+    with pytest.raises(BlockExecutionFailedException, match="Test error"):
         await executor.run()
 
 

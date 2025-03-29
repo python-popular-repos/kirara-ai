@@ -2,14 +2,16 @@ import re
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional
 
-from kirara_ai.im.message import IMMessage, TextMessage
+from kirara_ai.im.message import ImageMessage, IMMessage, TextMessage
 from kirara_ai.ioc.container import DependencyContainer
-from kirara_ai.llm.format.message import LLMChatMessage
+from kirara_ai.llm.format import LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatImageContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMAbility
 from kirara_ai.logger import get_logger
+from kirara_ai.memory.composes.base import ComposableMessageType
 from kirara_ai.workflow.core.block import Block, Input, Output, ParamMeta
 from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 
@@ -25,9 +27,9 @@ class ChatMessageConstructor(Block):
         "user_prompt_format": Input(
             "user_prompt_format", "本轮消息格式", str, "本轮消息格式", default=""
         ),
-        "memory_content": Input("memory_content", "上下文消息", str, "历史消息对话"),
+        "memory_content": Input("memory_content", "历史消息对话", List[ComposableMessageType], "历史消息对话"),
         "system_prompt_format": Input(
-            "system_prompt_format", "上下文消息格式", str, "上下文消息格式", default=""
+            "system_prompt_format", "系统提示词", str, "系统提示词", default=""
         ),
     }
     outputs = {
@@ -84,36 +86,37 @@ class ChatMessageConstructor(Block):
         executor = self.container.resolve(WorkflowExecutor)
 
         # 先替换自有的两个变量
-        system_prompt_format = system_prompt_format.replace(
-            "{current_date_time}", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        replacements = {
+            "{current_date_time}": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "{user_msg}": user_msg.content,
+            "{user_name}": user_msg.sender.display_name,
+            "{user_id}": user_msg.sender.user_id
+        }
+        
+        if isinstance(memory_content, list) and all(isinstance(item, str) for item in memory_content):
+            replacements["{memory_content}"] = "\n".join(memory_content)
 
-        system_prompt_format = system_prompt_format.replace(
-            "{user_msg}", user_msg.content
-        )
-        system_prompt_format = system_prompt_format.replace(
-            "{user_name}", user_msg.sender.display_name
-        )
-        system_prompt_format = system_prompt_format.replace(
-            "{memory_content}", memory_content
-        )
-
-        user_prompt_format = user_prompt_format.replace("{user_msg}", user_msg.content)
-        user_prompt_format = user_prompt_format.replace(
-            "{user_name}", user_msg.sender.display_name
-        )
-        user_prompt_format = user_prompt_format.replace(
-            "{memory_content}", memory_content
-        )
+        for old, new in replacements.items():
+            system_prompt_format = system_prompt_format.replace(old, new)
+            user_prompt_format = user_prompt_format.replace(old, new)
 
         # 再替换其他变量
         system_prompt = self.substitute_variables(system_prompt_format, executor)
         user_prompt = self.substitute_variables(user_prompt_format, executor)
 
+        content = [LLMChatTextContent(text=user_prompt)]
+        # 添加图片内容
+        for image in user_msg.images or []:
+            content.append(LLMChatImageContent(media_id=image.media_id))
+
         llm_msg = [
-            LLMChatMessage(role="system", content=system_prompt),
-            LLMChatMessage(role="user", content=user_prompt),
+            LLMChatMessage(role="system", content=[LLMChatTextContent(text=system_prompt)]),
         ]
+        
+        if isinstance(memory_content, list) and all(isinstance(item, LLMChatMessage) for item in memory_content):
+            llm_msg.extend(memory_content)
+            
+        llm_msg.append(LLMChatMessage(role="user", content=content))
         return {"llm_msg": llm_msg}
 
 
@@ -163,14 +166,15 @@ class ChatResponseConverter(Block):
     container: DependencyContainer
 
     def execute(self, resp: LLMChatResponse) -> Dict[str, Any]:
-        content = ""
-        if resp.choices and resp.choices[0].message:
-            content = resp.choices[0].message.content
-
-        # 通过 <break> 将回答分为不同的 TextMessage
         message_elements = []
-        for element in content.split("<break>"):
-            if element.strip():
-                message_elements.append(TextMessage(element.strip()))
+        
+        for part in resp.message.content:
+            if isinstance(part, LLMChatTextContent):
+                # 通过 <break> 将回答分为不同的 TextMessage
+                for element in part.text.split("<break>"):
+                    if element.strip():
+                        message_elements.append(TextMessage(element.strip()))
+            elif isinstance(part, LLMChatImageContent):
+                message_elements.append(ImageMessage(media_id=part.media_id))
         msg = IMMessage(sender="<@llm>", message_elements=message_elements)
         return {"msg": msg}

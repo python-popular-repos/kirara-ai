@@ -1,17 +1,23 @@
+import asyncio
+
 import aiohttp
 import requests
 from pydantic import BaseModel, ConfigDict
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
+from kirara_ai.media.manager import MediaManager
 
 
 class OllamaConfig(BaseModel):
     api_base: str = "http://localhost:11434"
     model_config = ConfigDict(frozen=True)
 
+async def resolv_media_ids(media_ids: list[str], media_manager: MediaManager) -> list[str]:
+    return [await media_manager.get_media(media_id).get_base64() for media_id in media_ids]
 
 class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     def __init__(self, config: OllamaConfig):
@@ -24,8 +30,25 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
 
         # 将消息转换为 Ollama 格式
         messages = []
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         for msg in req.messages:
-            messages.append({"role": msg.role, "content": msg.content})
+            # 收集每条消息中的文本内容和图像
+            text_content = ""
+            images = []
+            
+            for part in msg.content:
+                if isinstance(part, LLMChatTextContent):
+                    text_content += part.text
+                elif isinstance(part, LLMChatImageContent):
+                    images.append(part.media_id)
+            
+            # 创建 Ollama 格式的消息
+            message = {"role": msg.role, "content": text_content}
+            if images:
+                message["images"] = loop.run_until_complete(resolv_media_ids(images, self.media_manager))
+            
+            messages.append(message)
 
         data = {
             "model": req.model,
@@ -53,27 +76,21 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         except Exception as e:
             print(f"API Response: {response.text}")
             raise e
-
-        # 转换 Ollama 响应格式为标准的 LLMChatResponse 格式
-        transformed_response = {
-            "id": "ollama-" + req.model,
-            "object": "chat.completion",
-            "created": 0,
-            "model": req.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_data["message"]["content"],
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-        }
-
-        return LLMChatResponse(**transformed_response)
+        # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+        content = [LLMChatTextContent(text=response_data["message"]["content"])]
+        return LLMChatResponse(
+            model=req.model,
+            message=Message(
+                content=content,
+                role="assistant",
+                finish_reason="stop",
+            ),
+            usage=Usage(
+                prompt_tokens=response_data['prompt_eval_count'],
+                completion_tokens=response_data['eval_count'],
+                total_tokens=response_data['prompt_eval_count'] + response_data['eval_count'],
+            )
+        )
 
     async def auto_detect_models(self) -> list[str]:
         api_url = f"{self.config.api_base}/api/tags"

@@ -10,6 +10,7 @@ from kirara_ai.ioc.inject import Inject
 from kirara_ai.logger import get_logger
 from kirara_ai.workflow.core.block import Block, ConditionBlock, LoopBlock
 from kirara_ai.workflow.core.block.registry import BlockRegistry
+from kirara_ai.workflow.core.execution.exceptions import BlockExecutionFailedException
 from kirara_ai.workflow.core.workflow import Workflow
 
 
@@ -183,11 +184,10 @@ class WorkflowExecutor:
                 else:
                     # self.logger.debug(f"Block {block.name} is terminal node")
                     pass
+            except BlockExecutionFailedException as e:
+                raise e
             except Exception as e:
-                self.logger.error(
-                    f"Block {block.name} execution failed: {str(e)}", exc_info=True
-                )
-                raise RuntimeError(f"Block {block.name} execution failed: {e}")
+                raise BlockExecutionFailedException(f"Block {block.name} execution failed") from e
 
     def _can_execute(self, block: Block) -> bool:
         """检查节点是否可以执行"""
@@ -251,11 +251,11 @@ class WorkflowExecutor:
                     ]
                     # self.logger.debug(f"Resolved input {input_name} from {wire.source_block.name}.{wire.source_output}")
                 else:
-                    raise RuntimeError(
+                    raise BlockExecutionFailedException(
                         f"Source block {wire.source_block.name} not executed for input {input_name}"
                     )
             elif not block.inputs[input_name].nullable:
-                raise RuntimeError(
+                raise BlockExecutionFailedException(
                     f"Missing wire connection for required input {input_name} in block {block.name}"
                 )
 
