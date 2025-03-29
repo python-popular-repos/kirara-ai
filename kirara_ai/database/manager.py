@@ -1,6 +1,10 @@
 import os
 from typing import Optional
 
+from alembic import command
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
@@ -35,15 +39,51 @@ class DatabaseManager:
             db_url = self.database_url
         else:
             db_url = f"sqlite:///{self.db_path}"
+
         self.engine = create_engine(db_url, echo=self.is_debug)
 
         # 创建session工厂
         self.session_factory = sessionmaker(bind=self.engine)
 
-        # 创建所有表
-        Base.metadata.create_all(self.engine)
+        # 运行数据库迁移
+        self._run_migrations()
 
         logger.info(f"Database initialized at {self.engine.url}")
+
+    def _run_migrations(self):
+        """运行数据库迁移"""
+        try:
+            # 获取 alembic.ini 的路径
+            package_dir = os.path.dirname(os.path.dirname(__file__))
+            alembic_ini_path = os.path.join(package_dir, "alembic.ini")
+            
+            # 如果配置文件不存在，说明是作为包安装的，使用默认配置
+            if not os.path.exists(alembic_ini_path):
+                alembic_cfg = Config()
+                alembic_cfg.set_main_option("script_location", os.path.join(package_dir, "alembic"))
+            else:
+                alembic_cfg = Config(alembic_ini_path)
+                
+            alembic_cfg.set_main_option("sqlalchemy.url", str(self.engine.url))
+
+            # 检查是否需要迁移
+            with self.engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                current_rev = context.get_current_revision()
+                
+                script = ScriptDirectory.from_config(alembic_cfg)
+                head_rev = script.get_current_head()
+
+                if current_rev != head_rev:
+                    logger.info("Running database migrations...")
+                    command.upgrade(alembic_cfg, "head")
+                    logger.info("Database migrations completed")
+                else:
+                    logger.info("Database schema is up to date")
+
+        except Exception as e:
+            logger.error(f"Error during database migration: {e}")
+            raise
 
     def get_session(self) -> Session:
         """获取数据库会话"""
