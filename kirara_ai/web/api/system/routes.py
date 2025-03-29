@@ -56,10 +56,8 @@ async def logs_websocket():
         WebSocketLogHandler.add_websocket(websocket._get_current_object(), asyncio.get_event_loop())
         
         # 保持连接打开，直到客户端断开
-        while True:
-            # 等待客户端消息，但我们主要是推送日志，不需要处理客户端消息
-            await websocket.receive()
-            # 如果需要，可以在这里处理客户端发送的命令
+        while not shutdown_event.is_set():
+            await asyncio.sleep(1)
     finally:
         # 从日志处理器中移除当前连接
         WebSocketLogHandler.remove_websocket(websocket._get_current_object())
@@ -84,6 +82,9 @@ async def get_system_config():
             },
             "system": {
                 "timezone": config.system.timezone
+            },
+            "tracing": {
+                "llm_tracing_content": config.tracing.llm_tracing_content
             }
         }
     except Exception as e:
@@ -167,6 +168,23 @@ async def update_system_config():
         return {"status": "success"}
     except Exception as e:
         return {"error": str(e)}, 500
+    
+@system_bp.route("/config/tracing", methods=["POST"])
+@require_auth
+async def update_tracing_config():
+    """更新追踪配置"""
+    try:
+        data = await request.get_json()
+        config: GlobalConfig = g.container.resolve(GlobalConfig)
+        
+        config.tracing.llm_tracing_content = data["llm_tracing_content"]
+        
+        # 保存配置
+        ConfigLoader.save_config_with_backup(CONFIG_FILE, config)
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 
 @system_bp.route("/status", methods=["GET"])
 @require_auth

@@ -89,6 +89,11 @@ class SystemConfig(BaseModel):
 
     timezone: str = Field(default="Asia/Shanghai", description="时区")
 
+class TracingConfig(BaseModel):
+    """Tracing 配置"""
+    
+    llm_tracing_content: bool = Field(default=False, description="是否记录 LLM 请求内容")
+
 class GlobalConfig(BaseModel):
     ims: List[IMConfig] = Field(default=[], description="IM配置列表")
     llms: LLMConfig = LLMConfig()
@@ -99,5 +104,6 @@ class GlobalConfig(BaseModel):
     update: UpdateConfig = UpdateConfig()
     frpc: FrpcConfig = FrpcConfig()
     system: SystemConfig = SystemConfig()
+    tracing: TracingConfig = TracingConfig()
 
     model_config = ConfigDict(extra="allow")

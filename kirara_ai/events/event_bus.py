@@ -24,4 +24,5 @@ class EventBus:
                 try:
                     listener(event)
                 except Exception as e:
-                    logger.error(f"Error in listener {listener.__name__}: {e}", exc_info=True)
+                    listener_name = listener.__name__
+                    logger.opt(exception=e).error(f"Error in listener {listener_name}")

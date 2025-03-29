@@ -153,6 +153,7 @@ class FrpcManager:
                     
                     # 复制 frpc 可执行文件
                     frpc_path = str(self._frpc_path)
+                    os.makedirs(os.path.dirname(frpc_path), exist_ok=True)
                     shutil.copy2(frpc_files[0], frpc_path)
                     
                     # 设置可执行权限

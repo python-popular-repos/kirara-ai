@@ -1,11 +1,15 @@
 from typing import Dict, Type
 
+from kirara_ai.ioc.container import DependencyContainer
+from kirara_ai.ioc.inject import Inject
 from kirara_ai.memory.composes import MemoryComposer, MemoryDecomposer
 from kirara_ai.memory.scopes import MemoryScope
 
 
 class Registry:
     """基础注册表类"""
+    
+    container: DependencyContainer
 
     def __init__(self):
         self._registry: Dict[str, Type] = {}
@@ -27,7 +31,7 @@ class ScopeRegistry(Registry):
         """获取作用域实例"""
         if name not in self._registry:
             raise ValueError(f"Scope not found: {name}")
-        return self._registry[name]()
+        return Inject(self.container).create(self._registry[name])()
 
 
 class ComposerRegistry(Registry):
@@ -37,7 +41,7 @@ class ComposerRegistry(Registry):
         """获取组合器实例"""
         if name not in self._registry:
             raise ValueError(f"Composer not found: {name}")
-        return self._registry[name]()
+        return Inject(self.container).create(self._registry[name])()
 
 
 class DecomposerRegistry(Registry):
@@ -47,4 +51,4 @@ class DecomposerRegistry(Registry):
         """获取解析器实例"""
         if name not in self._registry:
             raise ValueError(f"Decomposer not found: {name}")
-        return self._registry[name]()
+        return Inject(self.container).create(self._registry[name])()

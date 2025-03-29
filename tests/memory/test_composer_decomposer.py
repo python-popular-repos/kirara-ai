@@ -5,7 +5,7 @@ import pytest
 
 from kirara_ai.im.message import IMMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
-from kirara_ai.llm.format.response import Message
+from kirara_ai.llm.format.message import LLMChatMessage, LLMChatTextContent
 from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomposer
 
 
@@ -40,7 +40,7 @@ class TestDefaultMemoryComposer:
 
         entry = composer.compose(group_sender, [message])
 
-        assert f"{group_sender.display_name} 说: {message.content}" in entry.content
+        assert f"{group_sender.display_name} 说: \n{message.content}" in entry.content
         assert isinstance(entry.timestamp, datetime)
 
     def test_compose_c2c_message(self, composer, c2c_sender):
@@ -51,15 +51,15 @@ class TestDefaultMemoryComposer:
 
         entry = composer.compose(c2c_sender, [message])
 
-        assert f"{c2c_sender.display_name} 说: {message.content}" in entry.content
+        assert f"{c2c_sender.display_name} 说: \n{message.content}" in entry.content
         assert isinstance(entry.timestamp, datetime)
 
     def test_compose_llm_response(self, composer, c2c_sender):
-        chat_message = Message(role="assistant", content="test response")
+        chat_message = LLMChatMessage(role="assistant", content=[LLMChatTextContent(text="test response")])
 
         entry = composer.compose(c2c_sender, [chat_message])
 
-        assert f"你回答: {chat_message.content}" in entry.content
+        assert f"你回答: \n{chat_message.content[0].text}" in entry.content
         assert isinstance(entry.timestamp, datetime)
 
 
@@ -80,14 +80,14 @@ class TestDefaultMemoryDecomposer:
 
         result = decomposer.decompose(entries)
 
-        assert len(result.split("\n")) == 2
-        assert "刚刚" in result
-        assert "group message" in result
-        assert "c2c message" in result
+        assert len(result) == 2
+        assert "刚刚" in result[0]
+        assert "group message" in result[0]
+        assert "c2c message" in result[1]
 
     def test_decompose_empty(self, decomposer):
         result = decomposer.decompose([])
-        assert result == decomposer.empty_message
+        assert result == [decomposer.empty_message]
 
     def test_decompose_max_entries(self, decomposer, c2c_sender):
         # 创建超过10条的记录
@@ -99,8 +99,7 @@ class TestDefaultMemoryDecomposer:
         ]
 
         result = decomposer.decompose(entries)
-        result_lines = result.split("\n")
 
         # 验证只返回最后10条
-        assert len(result_lines) == 10
-        assert "message 11" in result_lines[-1]
+        assert len(result) == 10
+        assert "message 11" in result[-1]

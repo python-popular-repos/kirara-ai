@@ -1,8 +1,11 @@
-from kirara_ai.im.adapter import IMAdapter
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kirara_ai.im.adapter import IMAdapter
 
 
 class IMEvent:
-    def __init__(self, im: IMAdapter):
+    def __init__(self, im: "IMAdapter"):
         self.im = im
         
     def __repr__(self):

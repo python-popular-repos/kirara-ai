@@ -18,6 +18,8 @@ from kirara_ai.logger import get_logger
 from kirara_ai.web.app import WebServer
 from kirara_ai.workflow.core.dispatch import WorkflowDispatcher
 
+from .utils import URL_PATTERN
+
 WEBHOOK_URL_PREFIX = "/im/webhook/qqbot"
 
 
@@ -150,6 +152,28 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
         # 文本缓冲区
         current_text = ""
         msg_seq = 0
+        url_replaced = False  # 标记是否替换过 URL
+
+        def replace_url_dots(text: str) -> str:
+            """
+            检查文本是否包含 URL，如果包含则替换 URL 中的句点为句号。
+            :param text: 要检查的文本。
+            :return: 替换后的文本。
+            """
+            nonlocal url_replaced
+            def replace_dots(match):
+                nonlocal url_replaced
+                url_replaced = True
+                return match.group(0).replace('.', '。')
+
+            return URL_PATTERN.sub(replace_dots, text)
+
+        async def send_text_message(text: str):
+            """
+            发送文本消息。
+            :param text: 要发送的文本内容。
+            """
+            await post_message_func(content=text, msg_seq=msg_seq)
 
         # 单次循环处理所有元素
         for element in message.message_elements:
@@ -158,7 +182,8 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
                 current_text += element.text
                 # 立即发送当前文本缓冲区内容
                 if current_text:
-                    await post_message_func(content=current_text, msg_seq=msg_seq)
+                    modified_text = replace_url_dots(current_text)
+                    await send_text_message(modified_text)
                     msg_seq += 1
                     current_text = ""
             elif isinstance(element, MentionElement):
@@ -167,7 +192,8 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
             elif isinstance(element, ImageMessage) or isinstance(element, VoiceMessage) or isinstance(element, VideoElement):
                 # 如果有累积的文本，先发送文本
                 if current_text:
-                    await post_message_func(content=current_text, msg_seq=msg_seq)
+                    modified_text = replace_url_dots(current_text)
+                    await send_text_message(modified_text)
                     msg_seq += 1
                     current_text = ""
 
@@ -179,13 +205,17 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
                 elif isinstance(element, VideoElement):
                     file_type = 2
                 media = await upload_func(file_type=file_type, file_data=await element.get_data())
-                print(media)
                 await post_message_func(media=media, msg_seq=msg_seq, msg_type=7)
                 msg_seq += 1
-
+        # 补充解释性文本
+        if url_replaced:
+            current_text = current_text + "（URL 中的句点已替换为句号以避免屏蔽）"
+            
         # 发送循环结束后可能剩余的文本
         if current_text:
-            await post_message_func(content=current_text)
+            modified_text = replace_url_dots(current_text)
+            await send_text_message(modified_text)
+            msg_seq += 1
 
     async def on_c2c_message_create(self, message: ymbotpy.message.C2CMessage):
         """

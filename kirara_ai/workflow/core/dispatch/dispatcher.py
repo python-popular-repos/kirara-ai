@@ -48,8 +48,7 @@ class WorkflowDispatcher:
                             continue
                         return await executor.run()
                 except Exception as e:
-                    self.logger.exception(e)
-                    self.logger.error(f"Workflow execution failed: {e}")
-                    raise e
+                    self.logger.opt(exception=e).error(f"Workflow execution failed: {e}", exc_info=True)
+                    return None
         self.logger.debug("No matching rule found for message")
         return None
