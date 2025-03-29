@@ -61,9 +61,8 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         # 构建请求数据
         data = {
             "model": req.model,
-            "messages": [
-                loop.run_until_complete(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager))
-            ],
+            "messages": 
+                loop.run_until_complete(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager)),
             "max_tokens": req.max_tokens,
             "system": system_message,
             "temperature": req.temperature,
