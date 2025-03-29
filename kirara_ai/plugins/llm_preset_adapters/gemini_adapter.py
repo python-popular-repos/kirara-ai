@@ -11,6 +11,7 @@ from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
+from kirara_ai.tracing import trace_llm_chat
 
 SAFETY_SETTINGS = [{
     "category": "HARM_CATEGORY_HARASSMENT",
@@ -70,6 +71,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         self.config = config
         self.logger = get_logger("GeminiAdapter")
 
+    @trace_llm_chat
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
         api_url = f"{self.config.api_base}/models/{req.model}:generateContent"
         headers = {

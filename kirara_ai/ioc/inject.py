@@ -17,8 +17,8 @@ def get_all_attributes(cls):
 
 
 class Inject:
-    def __init__(self, container: Any = None):
-        self.container = container  # 允许外部传入 container
+    def __init__(self, container: DependencyContainer = None):
+        self.container = container
 
     def create(self, target: type):
         # 注入类
@@ -79,23 +79,42 @@ class Inject:
 
     def inject_property(self, name, cls, injecting_type, prop: Optional[property]):
         # 获取 property 的 fget, fset, fdel
+        _value = None
+        
+        # 定义默认的 getter 方法
+        def default_fget(self):
+            nonlocal _value
+            return _value
+            
+        # 定义默认的 setter 方法
+        def default_fset(self, value):
+            nonlocal _value
+            _value = value
+            
+        # 定义默认的 deleter 方法
+        def default_fdel(self):
+            nonlocal _value
+            _value = None
+            
+        # 如果已有属性，使用其方法，否则使用默认方法
         if prop:
-            fget = prop.fget or (lambda self: None)
-            fset = prop.fset or (lambda self, value: None)
-            fdel = prop.fdel or (lambda self: None)
+            fget = prop.fget or default_fget
+            fset = prop.fset or default_fset
+            fdel = prop.fdel or default_fdel
         else:
-            fget = lambda self: None
-            fset = lambda self, value: None
-            fdel = lambda self: None
+            fget = default_fget
+            fset = default_fset
+            fdel = default_fdel
 
         # 为 property 的 fget 注入依赖
         @wraps(fget)
         def new_fget(_self):
             # 获取 property 的返回值
-            if self.container and isinstance(injecting_type, type):
+            if self.container and isinstance(injecting_type, type) and self.container.has(injecting_type):
                 # 如果返回值是一个类型，尝试从 container 中解析
                 return self.container.resolve(injecting_type)
-            raise ValueError(f"Type object {cls} has no attribute {name}")
+            else:
+                return _value
 
         # 返回新的 property
         return property(new_fget, fset, fdel)

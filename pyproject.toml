@@ -46,6 +46,7 @@ dependencies = [
     "ymbotpy",
     "Pillow",
     "pytz"
+    "sqlalchemy"
 ]
 
 

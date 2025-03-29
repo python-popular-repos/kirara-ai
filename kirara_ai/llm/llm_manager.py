@@ -75,6 +75,7 @@ class LLMManager:
         with self.container.scoped() as scoped_container:
             scoped_container.register(config_class, config_class(**backend.config))
             adapter = Inject(scoped_container).create(adapter_class)()
+            adapter.backend_name = backend_name
             self.backends[backend_name] = adapter
 
             # 注册到每个支持的模型
@@ -82,7 +83,7 @@ class LLMManager:
                 if model not in self.active_backends:
                     self.active_backends[model] = []
                 self.active_backends[model].append(adapter)
-        self.event_bus.post(LLMAdapterLoaded(adapter))
+        self.event_bus.post(LLMAdapterLoaded(adapter=adapter, backend_name=backend_name))
         self.logger.info(f"Backend {backend_name} loaded successfully")
 
     async def unload_backend(self, backend_name: str):
@@ -105,7 +106,7 @@ class LLMManager:
             if len(self.active_backends[model]) == 0:
                 self.active_backends.pop(model)
         backend = self.backends.pop(backend_name)
-        self.event_bus.post(LLMAdapterUnloaded(backend))
+        self.event_bus.post(LLMAdapterUnloaded(backend_name=backend_name, adapter=backend))
     async def reload_backend(self, backend_name: str):
         """
         重新加载指定的后端

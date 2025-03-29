@@ -11,6 +11,7 @@ from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
+from kirara_ai.tracing.decorator import trace_llm_chat
 
 
 class ClaudeConfig(BaseModel):
@@ -41,6 +42,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         self.config = config
         self.logger = get_logger("ClaudeAdapter")
 
+    @trace_llm_chat
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
         api_url = f"{self.config.api_base}/messages"
         headers = {

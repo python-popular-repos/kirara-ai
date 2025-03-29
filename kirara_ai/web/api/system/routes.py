@@ -56,10 +56,8 @@ async def logs_websocket():
         WebSocketLogHandler.add_websocket(websocket._get_current_object(), asyncio.get_event_loop())
         
         # 保持连接打开，直到客户端断开
-        while True:
-            # 等待客户端消息，但我们主要是推送日志，不需要处理客户端消息
-            await websocket.receive()
-            # 如果需要，可以在这里处理客户端发送的命令
+        while not shutdown_event.is_set():
+            await asyncio.sleep(1)
     finally:
         # 从日志处理器中移除当前连接
         WebSocketLogHandler.remove_websocket(websocket._get_current_object())

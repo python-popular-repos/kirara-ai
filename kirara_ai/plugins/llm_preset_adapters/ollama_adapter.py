@@ -10,6 +10,7 @@ from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
+from kirara_ai.tracing import trace_llm_chat
 
 
 class OllamaConfig(BaseModel):
@@ -23,7 +24,8 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     def __init__(self, config: OllamaConfig):
         self.config = config
         self.logger = get_logger("OllamaAdapter")
-
+        
+    @trace_llm_chat
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
         api_url = f"{self.config.api_base}/api/chat"
         headers = {"Content-Type": "application/json"}
