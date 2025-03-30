@@ -1,5 +1,5 @@
-name: AI对话-自定义分段
-description: 使用 <break> 作为关键词，让 AI 分段回复的工作流
+name: 聊天 - 自定义分段
+description: 使用 `<break>` 作为关键词，让 AI 分段回复的工作流
 blocks:
   - type: internal:text_block
     name: system_prompt
@@ -126,8 +126,7 @@ blocks:
       y: 192
   - type: internal:send_message
     name: msg_sender_lakgf8
-    params:
-      im_name: aa
+    params: {}
     position:
       x: 2377
       y: 346

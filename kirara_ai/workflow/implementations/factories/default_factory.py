@@ -86,7 +86,7 @@ A：上班肯定累呀<break>不过，我还是很喜欢这份工作的<break>�
         user_prompt = """{user_name}说：{user_msg}"""
 
         builder = (
-            WorkflowBuilder("默认 - 角色扮演")
+            WorkflowBuilder("聊天 - 角色扮演")
             .use(GetIMMessage, name="get_message")
             .parallel(
                 [
@@ -119,5 +119,5 @@ A：上班肯定累呀<break>不过，我还是很喜欢这份工作的<break>�
                 ]
             )
         )
-        builder.description = "扮演刘思思的角色和大家聊天~"
+        builder.description = "标准的文本对话功能，扮演刘思思的角色和大家聊天~"
         return builder
