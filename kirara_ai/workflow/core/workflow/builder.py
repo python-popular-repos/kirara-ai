@@ -198,6 +198,63 @@ class WorkflowBuilder:
 
         raise ValueError(f"Invalid block specification format: {block_spec}")
 
+    def _get_available_inputs(self, node: Node) -> List[str]:
+        """获取节点未被连接的输入端口"""
+        connected_inputs = {wire[3] for wire in self.wire_specs if wire[2] == node.name}
+        return [input_name for input_name in node.spec.block_class.inputs.keys() 
+                if input_name not in connected_inputs]
+
+    def _find_matching_ports(
+        self, 
+        source_node: Node, 
+        target_node: Node,
+        available_inputs: List[str]
+    ) -> List[Tuple[str, str]]:
+        """查找匹配的输出和输入端口
+        
+        Returns:
+            List of (output_name, input_name) pairs
+        """
+        matches = []
+        source_outputs = source_node.spec.block_class.outputs
+        target_inputs = {name: target_node.spec.block_class.inputs[name] 
+                        for name in available_inputs}
+
+        for out_name, output in source_outputs.items():
+            for in_name, input in target_inputs.items():
+                if output.data_type == input.data_type:
+                    matches.append((out_name, in_name))
+                    # 一旦找到匹配就从可用输入中移除
+                    target_inputs.pop(in_name)
+                    break
+
+        return matches
+
+    def _store_wire_spec(
+        self,
+        source_name: str,
+        target_name: str,
+        source_node: Optional[Node] = None,
+        target_node: Optional[Node] = None,
+    ):
+        """存储连接规格，自动匹配输入输出端口"""
+        if source_node is None:
+            source_node = self.nodes_by_name[source_name]
+        if target_node is None:
+            target_node = self.nodes_by_name[target_name]
+
+        # 获取目标节点的可用输入端口
+        available_inputs = self._get_available_inputs(target_node)
+        if not available_inputs:
+            return  # 如果没有可用的输入端口，直接返回
+
+        # 查找匹配的端口
+        matches = self._find_matching_ports(source_node, target_node, available_inputs)
+        
+        # 存储匹配的连接
+        for source_output, target_input in matches:
+            self.wire_specs.append((source_name, source_output, target_name, target_input))
+
     def _create_node(self, spec: BlockSpec, is_parallel: bool = False) -> Node:
         """创建一个新的节点，但不实例化 Block"""
         # 设置 block 名称
@@ -213,22 +270,11 @@ class WorkflowBuilder:
             for source_name in spec.wire_from:
                 source_node = self.nodes_by_name.get(source_name)
                 if source_node:
-                    # 存储连接信息，但不立即创建 Wire
-                    self._store_wire_spec(source_node.name, "output", node.name, "input")
+                    self._store_wire_spec(source_node.name, node.name, source_node, node)
         elif self.current:
-            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self._store_wire_spec(self.current.name, node.name, self.current, node)
 
         return node
-
-    def _store_wire_spec(
-        self,
-        source_name: str,
-        source_output: str,
-        target_name: str,
-        target_input: str,
-    ):
-        """存储连接规格"""
-        self.wire_specs.append((source_name, source_output, target_name, target_input))
 
     def use(
         self, block_class: Type[Block], name: str = None, **kwargs
@@ -293,7 +339,7 @@ class WorkflowBuilder:
         self.nodes_by_name[node.name] = node
 
         if self.current:
-            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self._store_wire_spec(self.current.name, "output", self.current, node)
             self.current.next_nodes.append(node)
             node.parent = self.current
         self.current = node
@@ -337,7 +383,7 @@ class WorkflowBuilder:
         self.nodes_by_name[node.name] = node
 
         if self.current:
-            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self._store_wire_spec(self.current.name, "output", self.current, node)
             self.current.next_nodes.append(node)
             node.parent = self.current
         self.current = node
@@ -358,9 +404,9 @@ class WorkflowBuilder:
         self.nodes_by_name[node.name] = node
 
         if self.current:
-            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self._store_wire_spec(self.current.name, "output", self.current, node)
             loop_start = next(n for n in self.current.ancestors() if n.is_loop)
-            self._store_wire_spec(node.name, "output", loop_start.name, "input")
+            self._store_wire_spec(node.name, "output", loop_start, node)
             node.parent = self.current
         self.current = node
         return self
@@ -407,8 +453,8 @@ class WorkflowBuilder:
         source_output: str,
         target_input: str,
     ):
-        """强制存储连接规格"""
-        self._store_wire_spec(source_name, source_output, target_name, target_input)
+        """强制存储特定的连接规格"""
+        self.wire_specs.append((source_name, source_output, target_name, target_input))
 
     def _find_parallel_nodes(self, start_node: Node) -> List[Node]:
         """查找所有并行节点"""
