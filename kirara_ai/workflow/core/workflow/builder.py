@@ -14,6 +14,21 @@ from kirara_ai.workflow.core.block.registry import BlockRegistry
 from .base import Wire, Workflow
 
 
+def get_block_class(type_name: str, registry: BlockRegistry) -> Type[Block]:
+    if type_name.startswith("!!"):
+        warnings.warn(
+            f"Loading block using class path: {type_name[2:]}. This is not recommended.",
+            UserWarning,
+        )
+        module_path, class_name = type_name[2:].rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        return getattr(module, class_name)
+
+    block_class = registry.get(type_name)
+    if block_class is None:
+        raise ValueError(f"Block type {type_name} not found in registry")
+    return block_class
+
 @dataclass
 class BlockSpec:
     """Block 规格的数据类，用于统一处理 block 的创建参数"""
@@ -31,23 +46,22 @@ class BlockSpec:
 
 @dataclass
 class Node:
-    block: Block
-    name: Optional[str] = None  # 可选的 name 属性
+    spec: BlockSpec
+    name: Optional[str] = None
     next_nodes: List["Node"] = None
     merge_point: "Node" = None
     parallel_nodes: List["Node"] = None
     is_parallel: bool = False
     condition: Callable = None
     is_conditional: bool = False
-    is_loop: bool = False  # 添加 is_loop 标记
+    is_loop: bool = False
     parent: "Node" = None
-    spec: BlockSpec = None
     position: Optional[Dict[str, int]] = None
 
     def __post_init__(self):
         self.next_nodes = self.next_nodes or []
         if not self.name:
-            self.name = f"{self.block.__class__.__name__}_{id(self)}"
+            self.name = self.spec.name or f"{self.spec.block_class.__name__}_{id(self)}"
 
     def ancestors(self) -> List["Node"]:
         """获取所有祖先节点"""
@@ -146,9 +160,9 @@ class WorkflowBuilder:
         self.description = ""
         self.head: Node = None
         self.current: Node = None
-        self.blocks: List[Block] = []
-        self.wires: List[Wire] = []
+        self.nodes: List[Node] = []  # 存储所有节点
         self.nodes_by_name: Dict[str, Node] = {}
+        self.wire_specs: List[Tuple[str, str, str, str]] = []  # (source_name, source_output, target_name, target_input)
 
     def _generate_unique_name(self, base_name: str) -> str:
         """生成唯一的块名称"""
@@ -185,20 +199,13 @@ class WorkflowBuilder:
         raise ValueError(f"Invalid block specification format: {block_spec}")
 
     def _create_node(self, spec: BlockSpec, is_parallel: bool = False) -> Node:
-        """创建并初始化一个新的节点"""
-        try:
-            block = spec.block_class(**spec.kwargs)
-        except Exception as e:
-            raise ValueError(f"Failed to create block {spec.block_class.__name__}: {e}")
-
+        """创建一个新的节点，但不实例化 Block"""
         # 设置 block 名称
-        if spec.name:
-            block.name = spec.name
-        else:
-            block.name = self._generate_unique_name(block.name)
+        if not spec.name:
+            spec.name = self._generate_unique_name(spec.block_class.__name__)
 
-        node = Node(block=block, name=block.name, is_parallel=is_parallel, spec=spec)
-        self.blocks.append(block)
+        node = Node(spec=spec, is_parallel=is_parallel)
+        self.nodes.append(node)
         self.nodes_by_name[node.name] = node
 
         # 处理连接
@@ -206,11 +213,22 @@ class WorkflowBuilder:
             for source_name in spec.wire_from:
                 source_node = self.nodes_by_name.get(source_name)
                 if source_node:
-                    self._connect_blocks(source_node.block, block)
-        elif self.current:  # 如果有当前节点且未指定连接源，则连接到当前节点
-            self._connect_blocks(self.current.block, block)
+                    # 存储连接信息，但不立即创建 Wire
+                    self._store_wire_spec(source_node.name, "output", node.name, "input")
+        elif self.current:
+            self._store_wire_spec(self.current.name, "output", node.name, "input")
 
         return node
+
+    def _store_wire_spec(
+        self,
+        source_name: str,
+        source_output: str,
+        target_name: str,
+        target_input: str,
+    ):
+        """存储连接规格"""
+        self.wire_specs.append((source_name, source_output, target_name, target_input))
 
     def use(
         self, block_class: Type[Block], name: str = None, **kwargs
@@ -261,14 +279,23 @@ class WorkflowBuilder:
     def if_then(
         self, condition: Callable[[Dict[str, Any]], bool], name: str = None
     ) -> "WorkflowBuilder":
-        condition_block = ConditionBlock(condition, self.current.block.outputs.copy())
-        node = Node(block=condition_block, name=name, is_conditional=True)
-        self.blocks.append(condition_block)
+        """添加条件判断"""
+        if not name:
+            name = self._generate_unique_name("condition")
+        
+        spec = BlockSpec(
+            block_class=ConditionBlock,
+            name=name,
+            kwargs={"condition": condition, "outputs": {}}  # outputs will be set during build
+        )
+        node = Node(spec=spec, is_conditional=True)
+        self.nodes.append(node)
         self.nodes_by_name[node.name] = node
 
-        self._connect_blocks(self.current.block, condition_block)
-        self.current.next_nodes.append(node)
-        node.parent = self.current
+        if self.current:
+            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self.current.next_nodes.append(node)
+            node.parent = self.current
         self.current = node
         return self
 
@@ -293,16 +320,26 @@ class WorkflowBuilder:
         iteration_var: str = "index",
     ) -> "WorkflowBuilder":
         """开始一个循环"""
-        loop_block = LoopBlock(
-            condition, self.current.block.outputs.copy(), iteration_var
+        if not name:
+            name = self._generate_unique_name("loop")
+        
+        spec = BlockSpec(
+            block_class=LoopBlock,
+            name=name,
+            kwargs={
+                "condition": condition,
+                "outputs": {},  # outputs will be set during build
+                "iteration_var": iteration_var
+            }
         )
-        node = Node(block=loop_block, name=name, is_loop=True)
-        self.blocks.append(loop_block)
+        node = Node(spec=spec, is_loop=True)
+        self.nodes.append(node)
         self.nodes_by_name[node.name] = node
 
-        self._connect_blocks(self.current.block, loop_block)
-        self.current.next_nodes.append(node)
-        node.parent = self.current
+        if self.current:
+            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            self.current.next_nodes.append(node)
+            node.parent = self.current
         self.current = node
         return self
 
@@ -311,51 +348,67 @@ class WorkflowBuilder:
         if not any(n.is_loop for n in self.current.ancestors()):
             raise ValueError("end_loop must close a loop block")
 
-        loop_end = LoopEndBlock(self.current.block.outputs.copy())
-        node = Node(block=loop_end)
-        self.blocks.append(loop_end)
+        spec = BlockSpec(
+            block_class=LoopEndBlock,
+            name=self._generate_unique_name("loop_end"),
+            kwargs={"outputs": {}}  # outputs will be set during build
+        )
+        node = Node(spec=spec)
+        self.nodes.append(node)
         self.nodes_by_name[node.name] = node
 
-        self._connect_blocks(self.current.block, loop_end)
-        loop_start = next(n for n in self.current.ancestors() if n.is_loop)
-        self._connect_blocks(loop_end, loop_start.block)
-
-        node.parent = self.current
+        if self.current:
+            self._store_wire_spec(self.current.name, "output", node.name, "input")
+            loop_start = next(n for n in self.current.ancestors() if n.is_loop)
+            self._store_wire_spec(node.name, "output", loop_start.name, "input")
+            node.parent = self.current
         self.current = node
         return self
 
-    def _connect_blocks(self, source_block: Block, target_block: Block):
-        """连接两个块，自动处理输入输出匹配，只连接一次"""
-        is_connected = False
-        for input_name, input in target_block.inputs.items():
-            for output_name, output in source_block.outputs.items():
-                # 检查数据类型是否匹配
-                if output.data_type == input.data_type:
-                    # 创建新的连线
-                    wire = Wire(source_block, output_name, target_block, input_name)
-                    # 跳过已被连接的 input
-                    if not any(
-                        w.target_block == wire.target_block
-                        and w.target_input == wire.target_input
-                        for w in self.wires
-                    ):
-                        is_connected = True
-                        self.wires.append(wire)
-                        break
-            # 如果连接成功，则跳出循环
-            if is_connected:
-                break
+    def build(self, container: DependencyContainer) -> Workflow:
+        """构建工作流，在此阶段实例化所有 Block 并创建 Wire"""
+        blocks = []
+        wires = []
+        name_to_block = {}
+        name_to_node = {}
+
+        # 首先实例化所有 Block
+        for node in self.nodes:
+            try:
+                # 如果是条件或循环块，需要从前一个块获取输出信息
+                if node.is_conditional or node.is_loop:
+                    prev_node = node.parent
+                    if prev_node and prev_node.spec.block_class:
+                        node.spec.kwargs["outputs"] = prev_node.spec.block_class.outputs.copy()
+                
+                block = node.spec.block_class(**node.spec.kwargs)
+                if node.name:
+                    block.name = node.name
+                block.container = container
+                blocks.append(block)
+                name_to_block[node.name] = block
+                name_to_node[node.name] = node
+            except Exception as e:
+                raise ValueError(f"Failed to create block {node.spec.block_class.__name__}: {e}")
+
+        # 然后创建所有 Wire
+        for source_name, source_output, target_name, target_input in self.wire_specs:
+            source_block = name_to_block.get(source_name)
+            target_block = name_to_block.get(target_name)
+            if source_block and target_block:
+                wires.append(Wire(source_block, source_output, target_block, target_input))
+
+        return Workflow(name=self.name, blocks=blocks, wires=wires, id=self.id)
 
     def force_connect(
         self,
-        source_block: Block,
-        target_block: Block,
+        source_name: str,
+        target_name: str,
         source_output: str,
         target_input: str,
     ):
-        """强制连接两个块"""
-        wire = Wire(source_block, source_output, target_block, target_input)
-        self.wires.append(wire)
+        """强制存储连接规格"""
+        self._store_wire_spec(source_name, source_output, target_name, target_input)
 
     def _find_parallel_nodes(self, start_node: Node) -> List[Node]:
         """查找所有并行节点"""
@@ -369,17 +422,6 @@ class WorkflowBuilder:
             else:
                 break
         return parallel_nodes
-
-    def build(self, container: DependencyContainer) -> Workflow:
-        """构建工作流"""
-        # Add unique name for each unnamed block
-        # TODO: 需要优化，不能直接修改 blocks 列表
-        for block in self.blocks:
-            if not block.name:
-                block.name = self._generate_unique_name(block.__class__.__name__)
-            block.container = container
-
-        return Workflow(name = self.name, blocks=self.blocks, wires=self.wires,id = self.id)
 
     def update_position(self, name: str, position: Tuple[int, int]):
         """更新节点的位置"""
@@ -400,8 +442,8 @@ class WorkflowBuilder:
 
         def serialize_node(node: Node) -> dict:
             block_data = {
-                "type": registry.get_block_type_name(node.block.__class__),
-                "name": node.block.name,
+                "type": registry.get_block_type_name(node.spec.block_class),
+                "name": node.name,
                 "params": node.spec.kwargs,
                 "position": node.position,
             }
@@ -411,24 +453,24 @@ class WorkflowBuilder:
 
             # 添加连接信息
             connected_to = []
-            for wire in self.wires:
-                if wire.source_block == node.block:
+            for wire in self.wire_specs:
+                if wire[0] == node.name:
                     # 使用 block.name 查找目标节点
                     target_node = next(
                         (
                             n
                             for n in self.nodes_by_name.values()
-                            if n.block.name == wire.target_block.name
+                            if n.name == wire[2]
                         ),
                         None,
                     )
                     if target_node:  # 只在找到目标节点时添加连接
                         connected_to.append(
                             {
-                                "target": target_node.block.name,
+                                "target": target_node.name,
                                 "mapping": {
-                                    "from": wire.source_output,
-                                    "to": wire.target_input,
+                                    "from": wire[1],
+                                    "to": wire[3],
                                 },
                             }
                         )
@@ -468,24 +510,9 @@ class WorkflowBuilder:
         builder.description = workflow_data.get("description", "")
         registry: BlockRegistry = container.resolve(BlockRegistry)
 
-        def get_block_class(type_name: str) -> Type[Block]:
-            if type_name.startswith("!!"):
-                warnings.warn(
-                    f"Loading block using class path: {type_name[2:]}. This is not recommended.",
-                    UserWarning,
-                )
-                module_path, class_name = type_name[2:].rsplit(".", 1)
-                module = importlib.import_module(module_path)
-                return getattr(module, class_name)
-
-            block_class = registry.get(type_name)
-            if block_class is None:
-                raise ValueError(f"Block type {type_name} not found in registry")
-            return block_class
-
         # 第一遍：创建所有块
         for block_data in workflow_data["blocks"]:
-            block_class = get_block_class(block_data["type"])
+            block_class = get_block_class(block_data["type"], registry)
             params = block_data.get("params", {})
 
             if block_data.get("parallel"):
@@ -500,15 +527,15 @@ class WorkflowBuilder:
                     builder.chain(block_class, name=block_data["name"], **params)
             builder.update_position(block_data["name"], block_data["position"])
         # 第二遍：建立连接
-        builder.wires = []
+        builder.wire_specs = []
         for block_data in workflow_data["blocks"]:
             if "connected_to" in block_data:
                 source_node = builder.nodes_by_name[block_data["name"]]
                 for connection in block_data["connected_to"]:
                     target_node = builder.nodes_by_name[connection["target"]]
                     builder.force_connect(
-                        source_node.block,
-                        target_node.block,
+                        source_node.name,
+                        target_node.name,
                         connection["mapping"]["from"],
                         connection["mapping"]["to"],
                     )

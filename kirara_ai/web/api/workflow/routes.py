@@ -50,25 +50,24 @@ async def get_workflow(group_id: str, workflow_id: str):
 
     # 构建工作流定义
     blocks = []
-    for block in builder.blocks:
-        position = builder.nodes_by_name[block.name].position
+    for node in builder.nodes:
         blocks.append(
             {
-                "type_name": block_registry.get_block_type_name(block.__class__),
-                "name": block.name,
-                "config": builder.nodes_by_name[block.name].spec.kwargs,
-                "position": position if position else {"x": 0, "y": 0},
+                "type_name": block_registry.get_block_type_name(node.spec.block_class),
+                "name": node.name,
+                "config": node.spec.kwargs,
+                "position": node.position if node.position else {"x": 0, "y": 0},
             }
         )
 
     wires = []
-    for wire in builder.wires:
+    for source_name, source_output, target_name, target_input in builder.wire_specs:
         wires.append(
             {
-                "source_block": wire.source_block.name,
-                "source_output": wire.source_output,
-                "target_block": wire.target_block.name,
-                "target_input": wire.target_input,
+                "source_block": source_name,
+                "source_output": source_output,
+                "target_block": target_name,
+                "target_input": target_input,
             }
         )
 
@@ -120,16 +119,12 @@ async def create_workflow(group_id: str, workflow_id: str):
             builder.update_position(block_def.name, block_def.position)
 
         # 添加连接
-        builder.wires = []
         for wire in workflow_def.wires:
-            source_block = next(
-                b for b in builder.blocks if b.name == wire.source_block
-            )
-            target_block = next(
-                b for b in builder.blocks if b.name == wire.target_block
-            )
             builder.force_connect(
-                source_block, target_block, wire.source_output, wire.target_input
+                wire.source_block,
+                wire.target_block,
+                wire.source_output,
+                wire.target_input
             )
 
         # 保存工作流
@@ -177,17 +172,14 @@ async def update_workflow(group_id: str, workflow_id: str):
                 builder.chain(block_class, name=block_def.name, **block_def.config)
 
             builder.update_position(block_def.name, block_def.position)
+
         # 添加连接
-        builder.wires = []
         for wire in workflow_def.wires:
-            source_block = next(
-                b for b in builder.blocks if b.name == wire.source_block
-            )
-            target_block = next(
-                b for b in builder.blocks if b.name == wire.target_block
-            )
             builder.force_connect(
-                source_block, target_block, wire.source_output, wire.target_input
+                wire.source_block,
+                wire.target_block,
+                wire.source_output,
+                wire.target_input
             )
 
         # 保存工作流
