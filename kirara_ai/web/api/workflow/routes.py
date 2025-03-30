@@ -56,7 +56,7 @@ async def get_workflow(group_id: str, workflow_id: str):
                 "type_name": block_registry.get_block_type_name(node.spec.block_class),
                 "name": node.name,
                 "config": node.spec.kwargs,
-                "position": node.position if node.position else {"x": 0, "y": 0},
+                "position": node.position or {"x": 0, "y": 0},
             }
         )
 
