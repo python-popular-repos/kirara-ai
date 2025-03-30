@@ -12,6 +12,9 @@ from kirara_ai.memory.entry import MemoryEntry
 from .base import ComposableMessageType, MemoryComposer, MemoryDecomposer
 
 
+def drop_think_part(text: str) -> str:
+    return re.sub("(?:<think>[\s\S]*?</think>)?([\s\S]*)", r"\1", text, flags=re.DOTALL)
+
 class DefaultMemoryComposer(MemoryComposer):
     def compose(
         self, sender: ChatSender, message: List[ComposableMessageType]
@@ -34,7 +37,7 @@ class DefaultMemoryComposer(MemoryComposer):
                 composed_message += f"你回答: \n"
                 for part in msg.content:
                     if isinstance(part, LLMChatTextContent):
-                        composed_message += f"{part.text}\n"
+                        composed_message += f"{drop_think_part(part.text)}\n"
                     elif isinstance(part, LLMChatImageContent):
                         media = self.container.resolve(MediaManager).get_media(part.media_id)
                         desc = media.description
