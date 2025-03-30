@@ -13,7 +13,7 @@ from .base import ComposableMessageType, MemoryComposer, MemoryDecomposer
 
 
 def drop_think_part(text: str) -> str:
-    return re.sub("(?:<think>[\s\S]*?</think>)?([\s\S]*)", r"\1", text, flags=re.DOTALL)
+    return re.sub(r"(?:<think>[\s\S]*?</think>)?([\s\S]*)", r"\1", text, flags=re.DOTALL)
 
 class DefaultMemoryComposer(MemoryComposer):
     def compose(

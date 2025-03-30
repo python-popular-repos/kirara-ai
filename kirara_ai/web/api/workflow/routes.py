@@ -33,7 +33,7 @@ async def list_workflows():
                 metadata=builder.metadata if hasattr(builder, "metadata") else None,
             )
         )
-
+    workflows.sort(key=lambda x: f"{x.group_id}:{x.workflow_id}")
     return WorkflowList(workflows=workflows).model_dump()
 
 
