@@ -8,6 +8,8 @@ from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 from kirara_ai.workflow.core.workflow.base import Workflow
 from kirara_ai.workflow.core.workflow.registry import WorkflowRegistry
 
+from .exceptions import WorkflowNotFoundException
+
 
 class WorkflowDispatcher:
     """工作流调度器"""
@@ -40,12 +42,11 @@ class WorkflowDispatcher:
                         scoped_container.register(IMAdapter, source)
                         scoped_container.register(IMMessage, message)
                         workflow = rule.get_workflow(scoped_container)
+                        if workflow is None:
+                            raise WorkflowNotFoundException(f"Workflow for rule {rule.name} not found, please check the rule configuration")
                         scoped_container.register(Workflow, workflow)
                         executor = WorkflowExecutor(scoped_container)
                         scoped_container.register(WorkflowExecutor, executor)
-                        if workflow is None:
-                            self.logger.error(f"Workflow {rule} not found")
-                            continue
                         return await executor.run()
                 except Exception as e:
                     self.logger.opt(exception=e).error(f"Workflow execution failed: {e}", exc_info=True)

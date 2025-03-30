@@ -285,6 +285,8 @@ class MediaManager:
             # 如果没有引用了，输出log提醒一下
             if not metadata.references:
                 self.logger.warning(f"No references found for media: {media_id}, file: {metadata.path}")
+                # 删除文件
+                self.delete_media(media_id)
     
     def delete_media(self, media_id: str) -> None:
         """删除媒体文件和元数据"""

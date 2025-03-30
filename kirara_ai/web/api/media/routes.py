@@ -64,7 +64,8 @@ def _convert_media_to_api_item(media: Media) -> Optional[MediaItem]:
             size=metadata.size or 0,
             upload_time=metadata.created_at,
             source=metadata.source,
-            tags=metadata.tags
+            tags=metadata.tags,
+            references=metadata.references or []
         )
     )
 
@@ -87,7 +88,7 @@ async def list_media():
         elif search_params.content_type.startswith("video/"):
             media_type = MediaType.VIDEO
         elif search_params.content_type.startswith("audio/"):
-            media_type = MediaType.VOICE
+            media_type = MediaType.AUDIO
         else:
             media_type = MediaType.FILE
         

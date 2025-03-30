@@ -18,7 +18,7 @@ from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 
 def model_name_options_provider(container: DependencyContainer, block: Block) -> List[str]:
     llm_manager: LLMManager = container.resolve(LLMManager)
-    return llm_manager.get_supported_models(LLMAbility.TextChat)
+    return sorted(llm_manager.get_supported_models(LLMAbility.TextChat))
 
 class ChatMessageConstructor(Block):
     name = "chat_message_constructor"

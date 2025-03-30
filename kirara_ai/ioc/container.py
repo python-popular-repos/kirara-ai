@@ -66,6 +66,17 @@ class DependencyContainer:
         else:
             raise KeyError(f"Dependency {key} not found.")
 
+
+    def has(self, key: Type[T] | Any) -> bool:
+        """
+        检测容器中是否能解析出某个键所对应的值。
+        Args:
+            key: 对象的标识键
+        Returns:
+            成功返回 True，失败返回 False
+        """
+        return key in self.registry or (self.parent and self.parent.has(key))
+
     @overload
     def destroy(self, key: Type[T]) -> None: ...
 
@@ -87,6 +98,7 @@ class DependencyContainer:
             self.parent.destroy(key)
         else: 
             raise KeyError(f"Cannot destroy dependency {key} which is not found in registry or parent container's registry.")
+
 
     def scoped(self):
         """创建一个新的作用域容器"""

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import traceback
 from collections import deque
 from datetime import datetime
 from typing import Any, Awaitable, Callable, Dict
@@ -83,6 +84,11 @@ class LogBroadcaster:
                 "timestamp": datetime.now().isoformat(),
                 "tag": tag
             }
+            
+            if message.record.get('exception'):
+                exception = message.record['exception']
+                if exception.value:
+                    log_entry["content"] += "\n" + '\n'.join(traceback.format_exception(exception.value))
             
             # 保存到最近日志
             _recent_logs.append(log_entry)

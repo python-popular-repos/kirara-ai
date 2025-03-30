@@ -187,7 +187,7 @@ class WorkflowExecutor:
             except BlockExecutionFailedException as e:
                 raise e
             except Exception as e:
-                raise BlockExecutionFailedException(f"Block {block.name} execution failed") from e
+                raise BlockExecutionFailedException(f"Block {block.name} execution failed: {e}") from e
 
     def _can_execute(self, block: Block) -> bool:
         """检查节点是否可以执行"""

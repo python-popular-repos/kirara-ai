@@ -2,6 +2,7 @@ import hashlib
 import os
 
 import aiohttp
+from packaging import version
 
 
 def get_installed_version() -> str:
@@ -20,21 +21,29 @@ def get_installed_version() -> str:
 
 
 async def get_latest_pypi_version(package_name: str) -> tuple[str, str]:
-    """获取包的最新版本和下载URL"""
+    """获取包的最新稳定版本和下载URL"""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://pypi.org/pypi/{package_name}/json") as response:
                 response.raise_for_status()
                 data = await response.json()
-                latest_version = data["info"]["version"]
-                # 获取最新版本的wheel包下载URL
-                for url_info in data["urls"]:
+                # 获取最新的稳定版本（非预发布版本）
+                releases = data["releases"]
+                stable_versions = [v for v in releases.keys() 
+                                    if not any(pre in v for pre in ['a', 'b', 'rc', 'dev', 'alpha', 'beta'])]
+                if not stable_versions:
+                    latest_version = data["info"]["version"]
+                else:
+                    # 按版本号排序，获取最新的稳定版本
+                    latest_version = max(stable_versions, key=lambda x: version.parse(x))
+                
+                # 获取最新稳定版本的wheel包下载URL
+                for url_info in data["releases"][latest_version]:
                     if url_info["packagetype"] == "bdist_wheel":
                         return latest_version, url_info["url"]
         return latest_version, ""
     except Exception:
         return "0.0.0", ""
-    
 
 async def get_latest_npm_version(package_name: str, registry: str = "https://registry.npmjs.org") -> tuple[str, str]:
     """获取NPM包的最新版本和下载URL"""
