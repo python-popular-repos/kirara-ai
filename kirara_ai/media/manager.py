@@ -155,6 +155,9 @@ class MediaManager:
                 raise
 
         # 计算 SHA1
+        if data is None:
+            raise ValueError("Unable to fetch data from url or path, please check your input")
+        
         hash_data = await asyncio.to_thread(hashlib.sha1, data)
         media_id = hash_data.hexdigest()
 
@@ -474,10 +477,6 @@ class MediaManager:
         
         metadata = self.metadata_cache[media_id]
         
-        # 如果有原始数据，直接返回
-        if hasattr(metadata, 'data') and metadata.data:
-            return metadata.data
-        
         # 尝试从文件读取
         file_path = await self.get_file_path(media_id)
         if file_path:
@@ -586,7 +585,7 @@ class MediaManager:
         # 根据媒体类型创建不同的MediaMessage子类
         if metadata.media_type == MediaType.IMAGE:
             return ImageMessage(media_id=media_id)
-        elif metadata.media_type == MediaType.VOICE:
+        elif metadata.media_type == MediaType.AUDIO:
             return VoiceMessage(media_id=media_id)
         elif metadata.media_type == MediaType.VIDEO:
             return VideoElement(media_id=media_id)

@@ -60,8 +60,10 @@ class MediaMetadata:
 
 
     @property
-    def mime_type(self) -> str:
+    def mime_type(self) -> Optional[str]:
         """获取 MIME 类型"""
+        if self.media_type is None or self.format is None:
+            return None
         return f"{self.media_type.value}/{self.format}"
     
     @classmethod

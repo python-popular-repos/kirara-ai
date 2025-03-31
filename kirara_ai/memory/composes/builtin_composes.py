@@ -4,7 +4,7 @@ from typing import List, Union
 
 from kirara_ai.im.message import IMMessage, MediaMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, RoleType
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.memory.entry import MemoryEntry
@@ -40,7 +40,7 @@ class DefaultMemoryComposer(MemoryComposer):
                         composed_message += f"{drop_think_part(part.text)}\n"
                     elif isinstance(part, LLMChatImageContent):
                         media = self.container.resolve(MediaManager).get_media(part.media_id)
-                        desc = media.description
+                        desc = media.description if media else ""
                         composed_message += f"<media_msg id={part.media_id} desc=\"{desc}\" />\n"
                         media_ids.append(part.media_id)
 
@@ -57,7 +57,7 @@ class DefaultMemoryComposer(MemoryComposer):
 
 
 class DefaultMemoryDecomposer(MemoryDecomposer):
-    def decompose(self, entries: List[MemoryEntry]) -> List[str]:
+    def decompose(self, entries: List[MemoryEntry]) -> List[ComposableMessageType]:
         if len(entries) == 0:
             return [self.empty_message]
 
@@ -124,7 +124,7 @@ class MultiElementDecomposer(MemoryDecomposer):
 
         return decomposed_messages
 
-    def create_llm_chat_message(self, content: str, role: str, sender: ChatSender) -> Union[LLMChatMessage, None]:
+    def create_llm_chat_message(self, content: str, role: RoleType, sender: ChatSender) -> Union[LLMChatMessage, None]:
         message_content: List[Union[LLMChatTextContent, LLMChatImageContent]] = []
 
         # 使用正则表达式提取 <media_msg> 标签
