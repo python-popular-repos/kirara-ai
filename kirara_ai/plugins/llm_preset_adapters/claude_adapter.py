@@ -1,12 +1,14 @@
 import asyncio
 import base64
+from typing import List
 
 import aiohttp
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
@@ -14,7 +16,7 @@ from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing.decorator import trace_llm_chat
 
 
-class ClaudeConfig(BaseModel):
+class ClaudeConfig(LLMBackendConfig):
     api_key: str
     api_base: str = "https://api.anthropic.com/v1"
     model_config = ConfigDict(frozen=True)
@@ -28,7 +30,9 @@ async def convert_llm_chat_message_to_claude_message(messages: list[LLMChatMessa
                 parts.append({"text": part.text, "type": "text"})
             elif isinstance(part, LLMChatImageContent):
                 media = media_manager.get_media(part.media_id)
-                parts.append({"source": {"media_type": media.mime_type, "data": await media.get_base64()}, "type": "image"})
+                if media is None:
+                    raise ValueError(f"Media {part.media_id} not found")
+                parts.append({"source": {"media_type": str(media.mime_type), "data": await media.get_base64()}, "type": "image"})
         content.append({
             "role": msg.role,
             "content": parts
@@ -83,14 +87,14 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             self.logger.error(f"API Response: {response.text}")
             raise e
         
-        content = []
+        content: List[LLMChatContentPartType] = []
         
         for res in response_data["content"]:
             if res["type"] == "text":
                 content.append(LLMChatTextContent(text=res["text"]))
             elif res["type"] == "image":
-                data = base64.b64decode(res["source"]["data"])
-                media = loop.run_until_complete(self.media_manager.register_from_data(data, res["source"]["mime_type"], source="claude response"))
+                image_data = base64.b64decode(res["source"]["data"])
+                media = loop.run_until_complete(self.media_manager.register_from_data(image_data, res["source"]["media_type"], source="claude response"))
                 content.append(LLMChatImageContent(media_id=media))
 
         return LLMChatResponse(

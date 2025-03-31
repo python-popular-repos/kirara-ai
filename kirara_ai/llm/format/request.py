@@ -10,7 +10,7 @@ class ResponseFormat(BaseModel):
 
 
 class LLMChatRequest(BaseModel):
-    messages: Optional[List[LLMChatMessage]] = None
+    messages: List[LLMChatMessage] = []
     model: Optional[str] = None
     frequency_penalty: Optional[int] = None
     max_tokens: Optional[int] = None

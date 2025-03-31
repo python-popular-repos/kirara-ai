@@ -67,8 +67,10 @@ class IMAdapter(ABC):
 
     llm_manager: LLMManager
 
+    is_running: bool
+
     @abstractmethod
-    def convert_to_message(self, raw_message: Any) -> IMMessage:
+    async def convert_to_message(self, raw_message: Any) -> IMMessage:
         """
         将平台的原始消息转换为 Message 对象。
         :param raw_message: 平台的原始消息对象。

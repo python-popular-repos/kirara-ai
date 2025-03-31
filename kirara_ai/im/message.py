@@ -19,7 +19,7 @@ class MessageElement(ABC):
         pass
 
     @abstractmethod
-    def to_plain(self):
+    def to_plain(self) -> str:
         pass
 
 
@@ -52,7 +52,7 @@ class MediaMessage(MessageElement):
         source: Optional[str] = "im_message",
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        media_manager: Optional[MediaManager] = None,   
+        media_manager: Optional[MediaManager] = None,
     ):
         self.url = url
         self.path = path
@@ -70,28 +70,28 @@ class MediaMessage(MessageElement):
             return
 
         # 注册媒体文件
-        
+
         # 使用线程创建新的事件循环来阻塞执行媒体注册
         import asyncio
         import threading
 
         # 用于存储线程中的异常
-        thread_exception = None
-        
+        thread_exception: Optional[Exception] = None
+
         def run_in_new_loop():
             nonlocal thread_exception
             try:
                 asyncio.run(self._register_media())
             except Exception as e:
                 thread_exception = e
-                
+
         # 在新线程中运行异步注册函数
         thread = threading.Thread(
-            target=run_in_new_loop, 
+            target=run_in_new_loop,
         )
         thread.start()
         thread.join()  # 阻塞等待完成
-        
+
         # 如果线程中发生异常，则在主线程中重新抛出
         if thread_exception:
             raise thread_exception
@@ -99,7 +99,7 @@ class MediaMessage(MessageElement):
     async def _register_media(self) -> None:
         """注册媒体文件"""
         media_manager = self._media_manager
-        
+
         # 根据传入的参数注册媒体文件
         self.media_id = await media_manager.register_media(
             url=self.url,
@@ -112,7 +112,7 @@ class MediaMessage(MessageElement):
             media_type=MIMETYPE_MAPPING[self.resource_type],
             reference_id=self._reference_id
         )
-        
+
         # 获取媒体元数据
         metadata = media_manager.get_metadata(self.media_id)
         if metadata and metadata.format:
@@ -124,68 +124,70 @@ class MediaMessage(MessageElement):
         """获取媒体资源的URL"""
         if not self.media_id:
             raise ValueError("Media not registered")
-            
+
         # 如果已经有URL，直接返回
         if self.url:
             return self.url
-            
+
         # 否则从媒体管理器获取
         media_manager = self._media_manager
         url = await media_manager.get_url(self.media_id)
         if url:
             self.url = url  # 缓存结果
             return url
-            
+
         raise ValueError("Failed to get media URL")
 
     async def get_path(self) -> str:
         """获取媒体资源的文件路径"""
         if not self.media_id:
             raise ValueError("Media not registered")
-            
+
         # 如果已经有路径，直接返回
         if self.path and Path(self.path).exists():
             return self.path
-            
+
         # 否则从媒体管理器获取
         media_manager = self._media_manager
         file_path = await media_manager.get_file_path(self.media_id)
         if file_path:
             self.path = str(file_path)  # 缓存结果
             return self.path
-            
+
         raise ValueError("Failed to get media file path")
 
     async def get_data(self) -> bytes:
         """获取媒体资源的二进制数据"""
         if not self.media_id:
             raise ValueError("Media not registered")
-            
+
         # 如果已经有数据，直接返回
         if self.data:
             return self.data
-            
+
         # 否则从媒体管理器获取
         media_manager = self._media_manager
         data = await media_manager.get_data(self.media_id)
         if data:
             self.data = data  # 缓存结果
             return data
-            
+
         raise ValueError("Failed to get media data")
-    
+
     def get_base64_url(self) -> str:
         """获取媒体资源的Base64 URL"""
         if not self.media_id:
             raise ValueError("Media not registered")
-            
+
         return self._media_manager.get_base64_url(self.media_id)
-    
+
     def get_description(self) -> str:
         """获取媒体资源的描述"""
+        if not self.media_id:
+            raise ValueError("Media not registered")
         metadata = self._media_manager.get_metadata(self.media_id)
         if metadata:
-            return metadata.description
+            return metadata.description or ""
         return ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -194,7 +196,7 @@ class MediaMessage(MessageElement):
             "type": self.resource_type,
             "media_id": self.media_id,
         }
-        
+
         # 添加可选属性
         if self.format:
             result["format"] = self.format
@@ -202,14 +204,14 @@ class MediaMessage(MessageElement):
             result["url"] = self.url
         if self.path:
             result["path"] = self.path
-            
+
         return result
 
 
 # 定义语音消息
 class VoiceMessage(MediaMessage):
     resource_type = "audio"
-    
+
     def to_dict(self):
         result = super().to_dict()
         result["type"] = "voice"
@@ -222,7 +224,7 @@ class VoiceMessage(MediaMessage):
 # 定义图片消息
 class ImageMessage(MediaMessage):
     resource_type = "image"
-    
+
     def to_dict(self):
         result = super().to_dict()
         result["type"] = "image"
@@ -284,7 +286,7 @@ class ReplyElement(MessageElement):
 # 定义文件消息元素
 class FileMessage(MediaMessage):
     resource_type = "file"
-    
+
     def to_dict(self):
         result = super().to_dict()
         result["type"] = "file"
@@ -333,7 +335,7 @@ class EmojiMessage(MessageElement):
 # 定义视频消息元素
 class VideoMessage(MediaMessage):
     resource_type = "video"
-    
+
     def to_dict(self):
         result = super().to_dict()
         result["type"] = "video"
@@ -400,7 +402,7 @@ class IMMessage:
         self,
         sender: ChatSender,
         message_elements: List[MessageElement],
-        raw_message: dict = None,
+        raw_message: Optional[dict] = None,
     ):
         self.sender = sender
         self.message_elements = message_elements
@@ -428,21 +430,3 @@ VideoElement = VideoMessage
 EmojiElement = EmojiMessage
 JsonElement = JsonMessage
 FaceElement = EmojiMessage
-
-# 示例用法
-if __name__ == "__main__":
-    # 创建消息元素
-    text_element = TextMessage("Hello, World!")
-    voice_element = VoiceMessage("https://example.com/voice.mp3", 120)
-    image_element = ImageMessage("https://example.com/image.jpg", 800, 600)
-
-    # 创建消息对象
-    message = IMMessage(
-        sender=ChatSender.from_c2c_chat("user123"),
-        message_elements=[text_element, voice_element, image_element],
-        raw_message={"platform": "example_chat", "timestamp": "2023-10-01T12:00:00Z"},
-    )
-
-    # 转换为字典格式
-    message_dict = message.to_dict()
-    print(message_dict)

@@ -61,7 +61,7 @@ class Media:
         return metadata.tags if metadata else []
     
     @property
-    def mime_type(self) -> str:
+    def mime_type(self) -> Optional[str]:
         """获取媒体 MIME 类型"""
         metadata = self.metadata
         return metadata.mime_type if metadata else None

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -30,7 +30,7 @@ class ChatSender:
     user_id: str
     chat_type: ChatType
     group_id: Optional[str] = None
-    raw_metadata: Dict[str, Any] = None
+    raw_metadata: Dict[str, Any] = field(default_factory=dict)
     callback = None
     
     @classmethod
@@ -39,7 +39,7 @@ class ChatSender:
         user_id: str,
         group_id: str,
         display_name: str,
-        metadata: Dict[str, Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> "ChatSender":
         """创建群聊发送者"""
         return cls(
@@ -52,7 +52,7 @@ class ChatSender:
 
     @classmethod
     def from_c2c_chat(
-        cls, user_id: str, display_name: str, metadata: Dict[str, Any] = None
+        cls, user_id: str, display_name: str, metadata: Optional[Dict[str, Any]] = None
     ) -> "ChatSender":
         """创建私聊发送者"""
         return cls(

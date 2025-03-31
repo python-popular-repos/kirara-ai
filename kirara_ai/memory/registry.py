@@ -10,9 +10,7 @@ class Registry:
     """基础注册表类"""
     
     container: DependencyContainer
-
-    def __init__(self):
-        self._registry: Dict[str, Type] = {}
+    _registry: Dict[str, Type] = dict()
 
     def register(self, name: str, cls: Type) -> None:
         """注册一个新的实现"""

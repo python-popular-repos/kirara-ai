@@ -26,3 +26,6 @@ class UserProfile(BaseModel):
     level: Optional[int] = Field(None, description="用户等级")
     language: Optional[str] = Field(None, description="语言")
     extra_info: Optional[dict] = Field(None, description="平台特定的额外信息")
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

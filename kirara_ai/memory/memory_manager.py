@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Type
 
 from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.ioc.inject import Inject
 from kirara_ai.media.carrier import MediaReferenceProvider
@@ -94,7 +95,7 @@ class MemoryManager(MediaReferenceProvider[List[MemoryEntry]]):
 
         self.persistence.save(scope_key, self.memories[scope_key])
 
-    def query(self, scope: MemoryScope, sender: str) -> List[MemoryEntry]:
+    def query(self, scope: MemoryScope, sender: ChatSender) -> List[MemoryEntry]:
         """查询历史记忆"""
         relevant_memories = []
         scope_key = scope.get_scope_key(sender)
@@ -118,10 +119,11 @@ class MemoryManager(MediaReferenceProvider[List[MemoryEntry]]):
         # 保存所有内存中的数据
         for scope_key, entries in self.memories.items():
             self.persistence.save(scope_key, entries)
-        # 执行持久化层的flush操作
-        self.persistence.stop()
+        # 执行持久化层的stop操作
+        if isinstance(self.persistence, AsyncMemoryPersistence):
+            self.persistence.stop()
 
-    def clear_memory(self, scope: MemoryScope, sender: str) -> None:
+    def clear_memory(self, scope: MemoryScope, sender: ChatSender) -> None:
         """清空指定作用域和发送者的记忆
 
         Args:
@@ -137,7 +139,7 @@ class MemoryManager(MediaReferenceProvider[List[MemoryEntry]]):
         # 保存空记录到持久化层
         self.persistence.save(scope_key, [])
 
-    def get_reference_owner(self, reference_key: str) -> Optional[MemoryEntry]:
+    def get_reference_owner(self, reference_key: str) -> Optional[List[MemoryEntry]]:
         """获取引用所有者"""
         if reference_key not in self.memories:
                 self.memories[reference_key] = self.persistence.load(reference_key)
