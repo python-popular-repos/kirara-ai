@@ -4,11 +4,12 @@ import base64
 import aiohttp
 import requests
 from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage, ToolCall, Function
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -44,24 +45,55 @@ class GeminiConfig(BaseModel):
 
 
 async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_manager: MediaManager) -> dict:
-    parts = []
-    for element in msg.content:
-        if isinstance(element, LLMChatTextContent):
-            parts.append({"text": element.text})
-        elif isinstance(element, LLMChatImageContent):
-            media = media_manager.get_media(element.media_id)
+    if msg.role in ["user", "assistant", "system"]:
+        parts = []
+        for element in msg.content:
+            if isinstance(element, LLMChatTextContent):
+                parts.append({"text": element.text})
+            elif isinstance(element, LLMChatImageContent):
+                media = media_manager.get_media(element.media_id)
+                parts.append({
+                    "inline_data": {
+                        "mime_type": media.mime_type,
+                        "data": await media.get_base64()
+                    }
+                })
+            elif isinstance(element, LLMToolCallContent):
+                parts.append({
+                    "functionCall": {
+                        "name": element.name,
+                        "args": element.parameters 
+                    }
+                })
+        return {
+            "role": "model" if msg.role == "assistant" else "user",
+            "parts": parts
+        }
+    elif msg.role == "tool":
+        # tool_result 的 role 必定为 "tool"。同时 "tool" 角色 messages 中只能是 LLMToolResultContent
+        parts = []
+        for element in msg.content:
             parts.append({
-                "inline_data": {
-                    "mime_type": media.mime_type,
-                    "data": await media.get_base64()
+                "functionResponse": {
+                    "name": element.name,
+                    "response": {
+                        "name": element.name,
+                        "content": element.content
+                    }
                 }
             })
+        return {"parts": parts}
 
-    return {
-        "role": "model" if msg.role == "assistant" else "user",
-        "parts": parts
-    }
-
+def convert_function_call(calls: list) -> Optional[list[ToolCall]]:
+    tool_calls = [
+        ToolCall(
+            function=Function(name=call.name, arguments=call.parameters)
+        ) for call in calls if isinstance(call, LLMToolCallContent)
+    ]
+    if tool_calls:
+        return tool_calls
+    else:
+        return None
 
 class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     
@@ -82,15 +114,9 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         # create a new asyncio loop to run the convert_llm_chat_message_to_gemini_message function
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        # use asyncio gather to run the convert_llm_chat_message_to_gemini_message function
-        contents = loop.run_until_complete(
-            asyncio.gather(
-                *[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages]
-            )
-        )
 
         data = {
-            "contents": contents ,
+            "contents": loop.run_until_complete(asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages])),
             "generationConfig": {
                 "temperature": req.temperature,
                 "topP": req.top_p,
@@ -100,6 +126,9 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "responseModalities": ["text"],
             },
             "safetySettings": SAFETY_SETTINGS,
+            "tools": [{
+                "functionDeclarations": [tool.model_dump() for tool in req.tools]
+            }] if req.tools else None
         }
         
         if req.model in IMAGE_MODAL_MODELS:
@@ -123,7 +152,10 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 data = base64.b64decode(part["inlineData"]["data"])
                 media = loop.run_until_complete(self.media_manager.register_from_data(data=data, format=part["inlineData"]["mimeType"].removeprefix("image/"), source="gemini response"))
                 content.append(LLMChatImageContent(media_id=media))
-                
+            elif "functionCall" in part:
+                # tool_call 部分不返回call_id
+                content.append(LLMToolCallContent(name=part["functionCall"]["name"], parameters=part["functionCall"].get("args", None)))
+   
         return LLMChatResponse(
             model=req.model,
             usage=Usage(
@@ -136,6 +168,8 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 content=content,
                 role="assistant",
                 finish_reason=response_data["candidates"][0].get("finishReason"),
+                # content格式转好直接用就行
+                tool_calls=convert_function_call(content)
             ),
         )
 
