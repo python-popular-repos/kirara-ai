@@ -27,7 +27,7 @@ class MediaManager:
         self.files_dir = self.media_dir / "files"
         self.metadata_cache: Dict[str, MediaMetadata] = {}
         self.logger = get_logger("MediaManager")
-        self._pending_tasks = set()
+        self._pending_tasks: set[asyncio.Task] = set()
         
         # 确保目录存在
         self.media_dir.mkdir(parents=True, exist_ok=True)
@@ -514,6 +514,21 @@ class MediaManager:
         
         return None
     
+    async def get_base64_url(self, media_id: str) -> Optional[str]:
+        """获取媒体文件 base64 URL"""
+        if media_id not in self.metadata_cache:
+            return None
+        
+        metadata = self.metadata_cache[media_id]
+        
+        data = await self.get_data(media_id)
+        if data and metadata.media_type and metadata.format:
+            mime_type = f"{metadata.media_type.value}/{metadata.format}"
+            return f"data:{mime_type};base64,{base64.b64encode(data).decode()}"
+        
+        return None
+    
+
     def search_by_tags(self, tags: List[str], match_all: bool = False) -> List[str]:
         """根据标签搜索媒体"""
         results = []

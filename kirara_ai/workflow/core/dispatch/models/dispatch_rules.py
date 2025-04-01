@@ -82,4 +82,6 @@ class CombinedDispatchRule(BaseModel):
 
     def get_workflow(self, container: DependencyContainer) -> Workflow:
         """获取该规则对应的工作流实例。"""
-        return container.resolve(WorkflowRegistry).get(self.workflow_id, container) 
+        workflow = container.resolve(WorkflowRegistry).get(self.workflow_id, container)
+        assert isinstance(workflow, Workflow)
+        return workflow

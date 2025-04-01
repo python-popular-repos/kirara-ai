@@ -30,7 +30,7 @@ async def list_workflows():
                 name=builder.name,
                 description=builder.description,
                 block_count=len(builder.nodes_by_name),
-                metadata=builder.metadata if hasattr(builder, "metadata") else None,
+                metadata=getattr(builder, "metadata", None),
             )
         )
     workflows.sort(key=lambda x: f"{x.group_id}:{x.workflow_id}")
@@ -47,6 +47,8 @@ async def get_workflow(group_id: str, workflow_id: str):
     builder = registry.get(full_id)
     if not builder:
         return jsonify({"error": "Workflow not found"}), 404
+
+    assert isinstance(builder, WorkflowBuilder)
 
     # 构建工作流定义
     blocks = []
@@ -78,7 +80,7 @@ async def get_workflow(group_id: str, workflow_id: str):
         description=builder.description,
         blocks=blocks,
         wires=wires,
-        metadata=builder.metadata if hasattr(builder, "metadata") else None,
+        metadata=getattr(builder, "metadata", None),
     )
 
     return WorkflowResponse(workflow=workflow_def).model_dump()

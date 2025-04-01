@@ -70,21 +70,26 @@ class TracingManager:
         """为指定追踪器注册WebSocket客户端"""
         if tracer := self.tracers.get(tracer_name):
             return tracer.register_ws_client()
-        
+        else:
+            raise ValueError(f"Tracer {tracer_name} not found")
     def unregister_ws_client(self, tracer_name: str, queue: asyncio.Queue):
         """从指定追踪器注销WebSocket客户端"""
         if tracer := self.tracers.get(tracer_name):
             tracer.unregister_ws_client(queue)
+        else:
+            raise ValueError(f"Tracer {tracer_name} not found")
 
     # 通用追踪操作方法
     def get_recent_traces(self, tracer_name: str, limit: int = 100) -> List[TraceRecord]:
         """获取指定追踪器的最近追踪记录"""
         if tracer := self.get_tracer(tracer_name):
             return tracer.get_recent_traces(limit)
-        return []
+        else:
+            raise ValueError(f"Tracer {tracer_name} not found")
 
     def get_trace_by_id(self, tracer_name: str, trace_id: str) -> Optional[TraceRecord]:
         """获取指定追踪器的特定追踪记录"""
         if tracer := self.get_tracer(tracer_name):
             return tracer.get_trace_by_id(trace_id)
-        return None
+        else:
+            raise ValueError(f"Tracer {tracer_name} not found")

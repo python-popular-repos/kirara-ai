@@ -3,13 +3,14 @@ from typing import Dict, Optional, Type
 from pydantic import BaseModel, Field
 
 from kirara_ai.im.adapter import IMAdapter
+from kirara_ai.web.api.im.models import IMAdapterConfig
 
 
 class IMAdapterInfo(BaseModel):
     """IM适配器信息"""
 
     name: str
-    config_class: Type[BaseModel] = Field(exclude=True)
+    config_class: Type[IMAdapterConfig] = Field(exclude=True)
     adapter_class: Type[IMAdapter] = Field(exclude=True)
     localized_name: Optional[str] = None
     localized_description: Optional[str] = None
@@ -25,7 +26,7 @@ class IMRegistry:
     def register(
         self, name: str,
         adapter_class: Type[IMAdapter],
-        config_class: Type[BaseModel],
+        config_class: Type[IMAdapterConfig],
         localized_name: Optional[str] = None,
         localized_description: Optional[str] = None,
         detail_info_markdown: Optional[str] = None
@@ -64,7 +65,7 @@ class IMRegistry:
                 f"IMAdapter with name '{name}' is not registered.")
         return self._registry[name].adapter_class
 
-    def get_config_class(self, name: str) -> Type[BaseModel]:
+    def get_config_class(self, name: str) -> Type[IMAdapterConfig]:
         """
         获取已注册的 adapter 配置类。
         :param name: adapter 的名称。

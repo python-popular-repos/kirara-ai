@@ -17,9 +17,3 @@ class ParamMeta:
 
     def __str__(self):
         return self.__repr__()
-    
-    def get_options(self, block: Block) -> List[T]:
-        if self.options_provider:
-            return self.options_provider(block)
-        return []
-    

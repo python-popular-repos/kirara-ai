@@ -2,8 +2,8 @@ from kirara_ai.im.adapter import IMAdapter
 from kirara_ai.im.message import IMMessage
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
+from kirara_ai.workflow.core.dispatch.models.dispatch_rules import CombinedDispatchRule
 from kirara_ai.workflow.core.dispatch.registry import DispatchRuleRegistry
-from kirara_ai.workflow.core.dispatch.rules.base import DispatchRule
 from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 from kirara_ai.workflow.core.workflow.base import Workflow
 from kirara_ai.workflow.core.workflow.registry import WorkflowRegistry
@@ -22,7 +22,7 @@ class WorkflowDispatcher:
         self.workflow_registry = container.resolve(WorkflowRegistry)
         self.dispatch_registry = container.resolve(DispatchRuleRegistry)
 
-    def register_rule(self, rule: DispatchRule):
+    def register_rule(self, rule: CombinedDispatchRule):
         """注册一个调度规则"""
         self.dispatch_registry.register(rule)
         self.logger.info(f"Registered dispatch rule: {rule}")

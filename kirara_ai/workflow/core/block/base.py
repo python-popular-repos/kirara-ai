@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional
 
+from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.workflow.core.block.input_output import Input, Output
 
 
@@ -14,6 +15,8 @@ class Block:
     inputs: Dict[str, Input] = {}
     # block 的输出
     outputs: Dict[str, Output] = {}
+    
+    container: DependencyContainer
 
     def __init__(
         self,

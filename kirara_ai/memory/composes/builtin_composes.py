@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta
-from typing import List, Union
+from typing import List, Optional, Union
 
 from kirara_ai.im.message import IMMessage, MediaMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
@@ -17,13 +17,13 @@ def drop_think_part(text: str) -> str:
 
 class DefaultMemoryComposer(MemoryComposer):
     def compose(
-        self, sender: ChatSender, message: List[ComposableMessageType]
+        self, sender: Optional[ChatSender], message: List[ComposableMessageType]
     ) -> MemoryEntry:
         composed_message = ""
         media_ids = []
         for msg in message:
             if isinstance(msg, IMMessage):
-                composed_message += f"{sender.display_name} 说: \n"
+                composed_message += f"{msg.sender.display_name} 说: \n"
                 for element in msg.message_elements:
                     if isinstance(element, MediaMessage):
                         desc = element.get_description()
@@ -47,7 +47,7 @@ class DefaultMemoryComposer(MemoryComposer):
         composed_message = composed_message.strip()
         composed_at = datetime.now()
         return MemoryEntry(
-            sender=sender,
+            sender=sender or ChatSender.get_bot_sender(),
             content=composed_message,
             timestamp=composed_at,
             metadata={
@@ -62,7 +62,7 @@ class DefaultMemoryDecomposer(MemoryDecomposer):
             return [self.empty_message]
 
         # 7秒前，<记忆内容>
-        memory_texts = []
+        memory_texts: List[ComposableMessageType] = []
         for entry in entries[-10:]:
             time_diff = datetime.now() - entry.timestamp
             time_str = self.get_time_str(time_diff)

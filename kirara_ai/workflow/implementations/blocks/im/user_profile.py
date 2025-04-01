@@ -15,7 +15,7 @@ class QueryUserProfileBlock(Block):
                 "chat_sender", "聊天对象", ChatSender, "要查询聊天对象的 profile"
             ),
             "im_adapter": Input(
-                "im_adapter", "IM 平台", IMAdapter, "IM 平台适配器", optional=True
+                "im_adapter", "IM 平台", IMAdapter, "IM 平台适配器", nullable=True
             ),
         }
         outputs = {"profile": Output("profile", "用户资料", UserProfile, "用户资料")}

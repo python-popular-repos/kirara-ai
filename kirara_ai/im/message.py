@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.media import MediaManager, MediaType
@@ -40,6 +40,8 @@ class TextMessage(MessageElement):
 
 # 定义媒体消息的基类
 class MediaMessage(MessageElement):
+    
+    resource_type: Literal["image", "audio", "video", "file"]
 
     def __init__(
         self,
@@ -64,6 +66,7 @@ class MediaMessage(MessageElement):
         self._description = description
         self._tags = tags or []
         self._media_manager = media_manager or MediaManager()
+        self.base64_url: Optional[str] = None
 
         # 如果已经有media_id，则直接使用
         if media_id:
@@ -174,12 +177,20 @@ class MediaMessage(MessageElement):
 
         raise ValueError("Failed to get media data")
 
-    def get_base64_url(self) -> str:
+    async def get_base64_url(self) -> str:
         """获取媒体资源的Base64 URL"""
         if not self.media_id:
             raise ValueError("Media not registered")
+        
+        if self.base64_url:
+            return self.base64_url
 
-        return self._media_manager.get_base64_url(self.media_id)
+        base64_url = await self._media_manager.get_base64_url(self.media_id)
+        if base64_url:
+            self.base64_url = base64_url
+            return base64_url
+
+        raise ValueError("Failed to get media base64 URL")
 
     def get_description(self) -> str:
         """获取媒体资源的描述"""

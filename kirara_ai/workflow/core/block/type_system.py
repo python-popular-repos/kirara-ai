@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Type, Union, get_args, get_origin
 class TypeSystem:
     """类型系统管理器，用于处理类型兼容性检查和类型名称映射"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._type_map: Dict[str, Type] = {}
         self._compatibility_cache: Dict[str, Dict[str, bool]] = {}
 
