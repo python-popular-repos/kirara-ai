@@ -1,8 +1,9 @@
 import base64
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from kirara_ai.im.message import MediaMessage
+if TYPE_CHECKING:
+    from kirara_ai.im.message import MediaMessage
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.media.metadata import MediaMetadata
 from kirara_ai.media.types.media_type import MediaType
@@ -106,7 +107,7 @@ class Media:
         """获取媒体文件 base64 URL"""
         return f"data:{self.mime_type};base64,{await self.get_base64()}"
     
-    async def create_message(self) -> MediaMessage:
+    async def create_message(self) -> "MediaMessage":
         """创建媒体消息对象"""
         message = await self._manager.create_media_message(self.media_id)
         assert message is not None, f"Media message not found for {self.media_id}"
