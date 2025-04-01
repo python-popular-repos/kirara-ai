@@ -42,6 +42,8 @@ class TextMessage(MessageElement):
 class MediaMessage(MessageElement):
     
     resource_type: Literal["image", "audio", "video", "file"]
+    
+    media_id: str
 
     def __init__(
         self,
@@ -60,16 +62,14 @@ class MediaMessage(MessageElement):
         self.path = path
         self.data = data
         self.format = format
-        self.media_id = media_id
         self._reference_id = reference_id
         self._source = source
         self._description = description
         self._tags = tags or []
         self._media_manager = media_manager or MediaManager()
         self.base64_url: Optional[str] = None
-
-        # 如果已经有media_id，则直接使用
         if media_id:
+            self.media_id = media_id
             return
 
         # 注册媒体文件

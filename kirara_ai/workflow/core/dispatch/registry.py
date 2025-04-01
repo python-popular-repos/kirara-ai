@@ -92,7 +92,7 @@ class DispatchRuleRegistry:
         rule_class = DispatchRule.get_rule_type(rule_type)
 
         # 提取规则配置
-        config_fields = rule_class.config_class.__fields__.keys()
+        config_fields = rule_class.config_class.model_fields.keys()
         rule_config = {k: rule_data[k] for k in config_fields if k in rule_data}
 
         # 创建简单规则

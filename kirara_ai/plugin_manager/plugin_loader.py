@@ -21,9 +21,9 @@ class PluginLoader:
         self.plugin_infos: Dict[str, PluginInfo] = {}  # 存储插件信息
         self.container = container
         self.logger = get_logger("PluginLoader")
-        self._loaded_entry_points = set()  # 记录已加载的entry points
+        self._loaded_entry_points: set[str] = set()  # 记录已加载的entry points
         self.plugin_dir = plugin_dir
-        self.internal_plugins = []
+        self.internal_plugins: List[str] = []
         self.config = self.container.resolve(GlobalConfig)
         self.event_bus = self.container.resolve(EventBus)
 
@@ -254,7 +254,7 @@ class PluginLoader:
 
             # 卸载前先禁用插件
             await self.disable_plugin(plugin_name)
-
+            assert plugin_info.package_name is not None
             # 执行卸载
             cmd = [
                 sys.executable,
@@ -359,6 +359,8 @@ class PluginLoader:
             plugin_info = self.plugin_infos.get(plugin_name)
             if not plugin_info:
                 return None
+            
+            assert plugin_info.package_name is not None
 
             if plugin_info.is_internal:
                 raise Exception("Cannot update internal plugin")
@@ -368,7 +370,7 @@ class PluginLoader:
             # 先关闭插件
             await self.disable_plugin(plugin_name)
             # 执行更新
-            cmd = [
+            cmd: List[str] = [
                 sys.executable,
                 "-m",
                 "pip",
@@ -377,7 +379,7 @@ class PluginLoader:
                 "--index-url",
                 self.config.update.pypi_registry,
                 plugin_info.package_name,
-            ]
+            ]      
 
             process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE

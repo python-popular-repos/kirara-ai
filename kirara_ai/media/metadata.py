@@ -28,8 +28,8 @@ class MediaMetadata:
         self.created_at = created_at or datetime.now()
         self.source = source
         self.description = description
-        self.tags = tags or []
-        self.references = references or set()
+        self.tags: List[str] = tags or []
+        self.references: Set[str] = references or set()
         self.url = url
         self.path = path
         

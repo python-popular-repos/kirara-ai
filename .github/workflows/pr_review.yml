@@ -28,6 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install .
           python -m pip install mypy types-requests types-setuptools
+          python -m mypy --install-types
 
       - name: Get changed Python files
         id: changed-files

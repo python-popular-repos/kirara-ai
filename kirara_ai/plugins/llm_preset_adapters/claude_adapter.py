@@ -21,10 +21,11 @@ class ClaudeConfig(LLMBackendConfig):
     api_base: str = "https://api.anthropic.com/v1"
     model_config = ConfigDict(frozen=True)
 
+
 async def convert_llm_chat_message_to_claude_message(messages: list[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
-    content = []
+    content: list[dict] = []
     for msg in [msg for msg in messages if msg.role in ["user", "assistant"]]:
-        parts = []
+        parts: list[dict] = []
         for part in msg.content:
             if isinstance(part, LLMChatTextContent):
                 parts.append({"text": part.text, "type": "text"})
@@ -38,10 +39,12 @@ async def convert_llm_chat_message_to_claude_message(messages: list[LLMChatMessa
             "content": parts
         })
     return content
+
+
 class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
-    
+
     media_manager: MediaManager
-    
+
     def __init__(self, config: ClaudeConfig):
         self.config = config
         self.logger = get_logger("ClaudeAdapter")
@@ -54,7 +57,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
-        
+
         # Claude 的系统消息比较特殊
         system_messages = [msg for msg in req.messages if msg.role == "system"]
         if system_messages:
@@ -67,8 +70,9 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         # 构建请求数据
         data = {
             "model": req.model,
-            "messages": 
-                loop.run_until_complete(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager)),
+            "messages":
+                loop.run_until_complete(convert_llm_chat_message_to_claude_message(
+                    req.messages, self.media_manager)),
             "max_tokens": req.max_tokens,
             "system": system_message,
             "temperature": req.temperature,
@@ -86,27 +90,32 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         except Exception as e:
             self.logger.error(f"API Response: {response.text}")
             raise e
-        
+
         content: List[LLMChatContentPartType] = []
-        
+
         for res in response_data["content"]:
             if res["type"] == "text":
                 content.append(LLMChatTextContent(text=res["text"]))
             elif res["type"] == "image":
                 image_data = base64.b64decode(res["source"]["data"])
-                media = loop.run_until_complete(self.media_manager.register_from_data(image_data, res["source"]["media_type"], source="claude response"))
+                media = loop.run_until_complete(self.media_manager.register_from_data(
+                    image_data, res["source"]["media_type"], source="claude response"))
                 content.append(LLMChatImageContent(media_id=media))
-
+        
+        usage_data = response_data.get("usage", {})
+        input_tokens = usage_data.get("input_tokens", 0)
+        output_tokens = usage_data.get("output_tokens", 0)
+        
         return LLMChatResponse(
             model=req.model,
             usage=Usage(
-                prompt_tokens=response_data["usage"]["input_tokens"],
-                completion_tokens=response_data["usage"]["output_tokens"],
-                total_tokens=response_data["usage"]["input_tokens"] + response_data["usage"]["output_tokens"],
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
             ),
             message=Message(
                 content=content,
-                role=response_data.get("role"),
+                role=response_data.get("role", "assistant"),
                 finish_reason=response_data.get("stop_reason", "stop"),
             ),
         )

@@ -28,4 +28,4 @@ class Usage(BaseModel):
 class LLMChatResponse(BaseModel):
     model: Optional[str] = None
     usage: Optional[Usage] = None
-    message: Optional[Message] = None
+    message: Message

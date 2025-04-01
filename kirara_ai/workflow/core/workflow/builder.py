@@ -568,7 +568,7 @@ class WorkflowBuilder:
             if block_data.get("parallel"):
                 # 处理并行节点
                 parallel_blocks = [(block_class, block_data["name"], params)]
-                builder.parallel(parallel_blocks)
+                builder.parallel(parallel_blocks) # type: ignore
             else:
                 # 处理普通节点
                 if builder.head is None:

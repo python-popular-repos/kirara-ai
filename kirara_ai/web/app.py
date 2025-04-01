@@ -95,7 +95,7 @@ def create_web_api_app(container: DependencyContainer) -> Quart:
         g.container = container
 
     @app.before_websocket
-    async def inject_container(): # type: ignore
+    async def inject_container_ws(): # type: ignore
         g.container = container
 
     app.container = container # type: ignore
