@@ -56,12 +56,31 @@ class Node:
     is_loop: bool = False
     parent: Optional["Node"] = None
     position: Optional[Dict[str, int]] = None
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.next_nodes = self.next_nodes or []
-        if not self.name:
-            self.name = self.spec.name or f"{self.spec.block_class.__name__}_{id(self)}"
+    def __init__(
+        self,
+        spec: BlockSpec,
+        name: Optional[str] = None,
+        next_nodes: Optional[List["Node"]] = None,
+        merge_point: Optional["Node"] = None,
+        parallel_nodes: Optional[List["Node"]] = None,
+        is_parallel: bool = False,
+        condition: Optional[Callable] = None,
+        is_conditional: bool = False,
+        is_loop: bool = False,
+        parent: Optional["Node"] = None,
+        position: Optional[Dict[str, int]] = None,
+    ):
+        self.spec = spec
+        self.name = name or spec.name or f"{spec.block_class.__name__}_{id(self)}"
+        self.next_nodes = next_nodes or []
+        self.merge_point = merge_point
+        self.parallel_nodes = parallel_nodes or []
+        self.is_parallel = is_parallel
+        self.condition = condition
+        self.is_conditional = is_conditional
+        self.is_loop = is_loop
+        self.parent = parent
+        self.position = position
 
     def ancestors(self) -> List["Node"]:
         """获取所有祖先节点"""

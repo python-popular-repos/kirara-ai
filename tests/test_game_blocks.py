@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from kirara_ai.im.message import IMMessage, TextMessage
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.workflow.implementations.blocks.game.dice import DiceRoll
 from kirara_ai.workflow.implementations.blocks.game.gacha import GachaSimulator
@@ -16,7 +17,7 @@ def container():
 @pytest.fixture
 def create_message():
     def _create(content: str) -> IMMessage:
-        return IMMessage(sender="test_user", message_elements=[TextMessage(content)])
+        return IMMessage(sender=ChatSender.from_c2c_chat(user_id="test_user", display_name="Test User"), message_elements=[TextMessage(content)])
 
     return _create
 
@@ -30,7 +31,7 @@ def test_dice_roll_basic(container, create_message):
     assert "response" in result
     response = result["response"]
     assert isinstance(response, IMMessage)
-    assert response.sender == "<@bot>"
+    assert response.sender == ChatSender.get_bot_sender()
     assert len(response.message_elements) == 1
     assert "掷出了 2d6" in response.content
 

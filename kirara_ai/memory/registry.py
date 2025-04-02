@@ -11,6 +11,10 @@ class Registry:
     
     container: DependencyContainer
     _registry: Dict[str, Type] = dict()
+    
+    def __init__(self, container: DependencyContainer):
+        self.container = container
+        self._registry = dict()
 
     def register(self, name: str, cls: Type) -> None:
         """注册一个新的实现"""

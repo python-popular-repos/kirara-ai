@@ -185,14 +185,15 @@ async def delete_backend(backend_name: str):
         if backend_index == -1:
             return jsonify({"error": f"Backend {backend_name} not found"}), 404
 
+        backend = config.llms.api_backends[backend_index]
+        # 如果后端已启用，要卸载
+        if backend.enable:
+            await manager.unload_backend(backend_name)
+            
         # 从配置中删除
         deleted_backend = config.llms.api_backends.pop(backend_index)
 
         ConfigLoader.save_config_with_backup(CONFIG_FILE, config)
-
-        # 如果后端已启用，要卸载
-        if deleted_backend.enable:
-            await manager.unload_backend(backend_name)
             
         return LLMBackendResponse(
             data=LLMBackendInfo(
