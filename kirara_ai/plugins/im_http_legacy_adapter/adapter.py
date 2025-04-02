@@ -179,6 +179,8 @@ class HttpLegacyAdapter(IMAdapter):
             request_time = str(int(time.time() * 1000))
 
             message = await self.convert_to_message(data)
+            assert message.raw_message is not None
+            
             session_id = message.raw_message["session_id"]
 
             bot_request = V2Request(

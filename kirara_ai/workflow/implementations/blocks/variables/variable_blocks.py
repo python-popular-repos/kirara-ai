@@ -10,11 +10,11 @@ T = TypeVar("T")
 
 class SetVariableBlock(Block):
     def __init__(self, container: DependencyContainer):
-        inputs = {
+        inputs: Dict[str, Input] = {
             "name": Input("name", "变量名", str, "变量名"),
             "value": Input("value", "变量值", Any, "变量值"), # type: ignore
         }
-        outputs = {}  # 这个 block 不需要输出
+        outputs: Dict[str, Output] = {}  # 这个 block 不需要输出
         super().__init__("set_variable", inputs, outputs)
         self.container = container
 

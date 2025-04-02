@@ -87,8 +87,8 @@ class LLMRequestTrace(TraceRecord):
             "trace_id": self.trace_id,
             "model_id": self.model_id,
             "backend_name": self.backend_name,
-            "request_time": self.request_time.isoformat() if self.request_time else None,
-            "response_time": self.response_time.isoformat() if self.response_time else None,
+            "request_time": self.request_time.isoformat() if self.request_time else None, # type: ignore
+            "response_time": self.response_time.isoformat() if self.response_time else None, # type: ignore
             "duration": self.duration,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
@@ -108,7 +108,7 @@ class LLMRequestTrace(TraceRecord):
     @property
     def request(self) -> Optional[Dict[str, Any]]:
         """获取请求内容"""
-        return json.loads(self.request_json) if self.request_json else None
+        return json.loads(self.request_json) if self.request_json else None  # type: ignore
     
     @request.setter
     def request(self, value: Any):
@@ -119,7 +119,7 @@ class LLMRequestTrace(TraceRecord):
     @property
     def response(self) -> Optional[Dict[str, Any]]:
         """获取响应内容"""
-        return json.loads(self.response_json) if self.response_json else None
+        return json.loads(self.response_json) if self.response_json else None  # type: ignore
     
     @response.setter
     def response(self, value: Any):
