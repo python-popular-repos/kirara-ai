@@ -39,7 +39,9 @@ class DispatchRule(ABC):
 
     def get_workflow(self, container: DependencyContainer) -> Workflow:
         """获取该规则对应的工作流实例。"""
-        return self.workflow_registry.get(self.workflow_id, container)
+        workflow = self.workflow_registry.get(self.workflow_id, container)
+        assert isinstance(workflow, Workflow)
+        return workflow
 
     @classmethod
     def register_rule_type(cls, rule_class: Type["DispatchRule"]):

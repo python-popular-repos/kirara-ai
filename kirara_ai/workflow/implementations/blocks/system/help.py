@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from kirara_ai.im.message import IMMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
@@ -52,7 +52,7 @@ class GenerateHelp(Block):
         rules = registry.get_active_rules()
 
         # 按类别组织命令
-        commands = {}
+        commands: Dict[str, List[Dict[str, Any]]] = {}
         for rule in rules:
             # 从 workflow 名称获取类别
             category = rule.workflow_id.split(":")[0].lower()

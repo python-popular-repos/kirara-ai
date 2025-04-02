@@ -2,10 +2,11 @@ import re
 from datetime import datetime
 from typing import Annotated, Any, Dict, List, Optional
 
-from kirara_ai.im.message import ImageMessage, IMMessage, TextMessage
+from kirara_ai.im.message import ImageMessage, IMMessage, MessageElement, TextMessage
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.format import LLMChatMessage, LLMChatTextContent
-from kirara_ai.llm.format.message import LLMChatImageContent
+from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.llm.llm_manager import LLMManager
@@ -104,7 +105,7 @@ class ChatMessageConstructor(Block):
         system_prompt = self.substitute_variables(system_prompt_format, executor)
         user_prompt = self.substitute_variables(user_prompt_format, executor)
 
-        content = [LLMChatTextContent(text=user_prompt)]
+        content: List[LLMChatContentPartType] = [LLMChatTextContent(text=user_prompt)]
         # 添加图片内容
         for image in user_msg.images or []:
             content.append(LLMChatImageContent(media_id=image.media_id))
@@ -114,7 +115,7 @@ class ChatMessageConstructor(Block):
         ]
         
         if isinstance(memory_content, list) and all(isinstance(item, LLMChatMessage) for item in memory_content):
-            llm_msg.extend(memory_content)
+            llm_msg.extend(memory_content) # type: ignore
             
         llm_msg.append(LLMChatMessage(role="user", content=content))
         return {"llm_msg": llm_msg}
@@ -166,7 +167,7 @@ class ChatResponseConverter(Block):
     container: DependencyContainer
 
     def execute(self, resp: LLMChatResponse) -> Dict[str, Any]:
-        message_elements = []
+        message_elements: List[MessageElement] = []
         
         for part in resp.message.content:
             if isinstance(part, LLMChatTextContent):
@@ -176,5 +177,5 @@ class ChatResponseConverter(Block):
                         message_elements.append(TextMessage(element.strip()))
             elif isinstance(part, LLMChatImageContent):
                 message_elements.append(ImageMessage(media_id=part.media_id))
-        msg = IMMessage(sender="<@llm>", message_elements=message_elements)
+        msg = IMMessage(sender=ChatSender.get_bot_sender(), message_elements=message_elements)
         return {"msg": msg}

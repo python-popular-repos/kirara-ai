@@ -1,5 +1,6 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.workflow.core.block.input_output import Input, Output
 
 
@@ -14,6 +15,8 @@ class Block:
     inputs: Dict[str, Input] = {}
     # block 的输出
     outputs: Dict[str, Output] = {}
+    
+    container: DependencyContainer
 
     def __init__(
         self,
@@ -97,7 +100,7 @@ class LoopEndBlock(Block):
     def __init__(self, inputs: Dict[str, "Input"]):
         super().__init__()
         self.inputs = inputs
-        self.results = []
+        self.results: List[Dict[str, Any]] = []
 
     def execute(self, **kwargs) -> Dict[str, Any]:
         self.results.append(kwargs)

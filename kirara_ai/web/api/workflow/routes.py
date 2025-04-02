@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from quart import Blueprint, g, jsonify, request
 
@@ -7,7 +8,7 @@ from kirara_ai.workflow.core.workflow import WorkflowRegistry
 from kirara_ai.workflow.core.workflow.builder import WorkflowBuilder
 
 from ...auth.middleware import require_auth
-from .models import WorkflowDefinition, WorkflowInfo, WorkflowList, WorkflowResponse
+from .models import BlockInstance, Wire, WorkflowDefinition, WorkflowInfo, WorkflowList, WorkflowResponse
 
 workflow_bp = Blueprint("workflow", __name__)
 
@@ -30,7 +31,7 @@ async def list_workflows():
                 name=builder.name,
                 description=builder.description,
                 block_count=len(builder.nodes_by_name),
-                metadata=builder.metadata if hasattr(builder, "metadata") else None,
+                metadata=getattr(builder, "metadata", None),
             )
         )
     workflows.sort(key=lambda x: f"{x.group_id}:{x.workflow_id}")
@@ -48,27 +49,29 @@ async def get_workflow(group_id: str, workflow_id: str):
     if not builder:
         return jsonify({"error": "Workflow not found"}), 404
 
+    assert isinstance(builder, WorkflowBuilder)
+
     # 构建工作流定义
-    blocks = []
+    blocks: List[BlockInstance] = []
     for node in builder.nodes:
         blocks.append(
-            {
-                "type_name": block_registry.get_block_type_name(node.spec.block_class),
-                "name": node.name,
-                "config": node.spec.kwargs,
-                "position": node.position or {"x": 0, "y": 0},
-            }
+            BlockInstance(
+                type_name=block_registry.get_block_type_name(node.spec.block_class),
+                name=node.name,
+                config=node.spec.kwargs,
+                position=node.position or {"x": 0, "y": 0},
+            )
         )
 
-    wires = []
+    wires: List[Wire] = []
     for source_name, source_output, target_name, target_input in builder.wire_specs:
         wires.append(
-            {
-                "source_block": source_name,
-                "source_output": source_output,
-                "target_block": target_name,
-                "target_input": target_input,
-            }
+            Wire(
+                source_block=source_name,
+                source_output=source_output,
+                target_block=target_name,
+                target_input=target_input,
+            )
         )
 
     workflow_def = WorkflowDefinition(
@@ -78,7 +81,7 @@ async def get_workflow(group_id: str, workflow_id: str):
         description=builder.description,
         blocks=blocks,
         wires=wires,
-        metadata=builder.metadata if hasattr(builder, "metadata") else None,
+        metadata=getattr(builder, "metadata", None),
     )
 
     return WorkflowResponse(workflow=workflow_def).model_dump()

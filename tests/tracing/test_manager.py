@@ -91,8 +91,8 @@ class TestTracingManager(TracingTestBase, IsolatedAsyncioTestCase):
         self.assertEqual(len(traces), 0)
 
         # 测试获取不存在的追踪器的记录
-        traces = self.manager.get_recent_traces("non-existent")
-        self.assertEqual(len(traces), 0)
+        with self.assertRaises(ValueError):
+            self.manager.get_recent_traces("non-existent")
 
         # 测试获取特定追踪记录
         trace = self.manager.get_trace_by_id("test", "non-existent-id")

@@ -1,11 +1,7 @@
 import contextvars
-from typing import Any, Type, TypeVar, overload
+from typing import Any, Optional, Type, TypeVar, overload
 
 T = TypeVar("T")
-
-# 使用 contextvars 实现线程和异步安全的上下文管理
-current_container = contextvars.ContextVar("current_container", default=None)
-
 
 class DependencyContainer:
     """
@@ -75,7 +71,7 @@ class DependencyContainer:
         Returns:
             成功返回 True，失败返回 False
         """
-        return key in self.registry or (self.parent and self.parent.has(key))
+        return key in self.registry or (self.parent is not None and self.parent.has(key))
 
     @overload
     def destroy(self, key: Type[T]) -> None: ...
@@ -109,6 +105,9 @@ class DependencyContainer:
             new_container.registry[ScopedContainer] = new_container
         return new_container
 
+
+# 使用 contextvars 实现线程和异步安全的上下文管理
+current_container = contextvars.ContextVar[Optional[DependencyContainer]]("current_container", default=None)
 
 class ScopedContainer(DependencyContainer):
     def __init__(self, parent):

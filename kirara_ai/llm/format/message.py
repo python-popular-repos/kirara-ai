@@ -2,6 +2,7 @@ from typing import List, Literal, Union
 
 from pydantic import BaseModel
 
+RoleType = Literal["system", "user", "assistant"]
 
 class LLMChatTextContent(BaseModel):
     type: Literal["text"] = "text"
@@ -14,6 +15,6 @@ class LLMChatImageContent(BaseModel):
 LLMChatContentPartType = Union[LLMChatTextContent, LLMChatImageContent]
 
 class LLMChatMessage(BaseModel):
-    role: Literal["system", "user", "assistant"]
+    role: RoleType
     content: List[LLMChatContentPartType]
 

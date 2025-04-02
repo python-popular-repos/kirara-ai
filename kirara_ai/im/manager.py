@@ -1,6 +1,8 @@
 import asyncio
 from typing import Dict, Type
 
+from pydantic import BaseModel
+
 from kirara_ai.config.config_loader import pydantic_validation_wrapper
 from kirara_ai.config.global_config import GlobalConfig, IMConfig
 from kirara_ai.events.event_bus import EventBus
@@ -68,7 +70,7 @@ class IMManager:
                 return im
         raise ValueError(f"Adapter {name} not found")
 
-    def update_adapter_config(self, name: str, config: IMConfig):
+    def update_adapter_config(self, name: str, config: BaseModel):
         """
         更新指定名称的 adapter 的配置。
         :param name: adapter 的名称
@@ -185,7 +187,7 @@ class IMManager:
         return key in self.adapters and getattr(self.adapters[key], "is_running", False)
 
     def create_adapter(
-        self, name: str, adapter_class: Type[IMAdapter], adapter_config: IMConfig
+        self, name: str, adapter_class: Type[IMAdapter], adapter_config: BaseModel
     ) -> IMAdapter:
         with self.container.scoped() as scoped_container:
             scoped_container.register(adapter_config.__class__, adapter_config)

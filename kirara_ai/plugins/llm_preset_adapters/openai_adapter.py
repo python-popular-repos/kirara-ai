@@ -1,11 +1,13 @@
 import asyncio
+from typing import List
 
 import aiohttp
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage
 from kirara_ai.logger import get_logger
@@ -21,6 +23,8 @@ async def convert_llm_chat_message_to_openai_message(msg: LLMChatMessage, media_
             parts.append(element.model_dump(mode="json"))
         elif isinstance(element, LLMChatImageContent):
             media = media_manager.get_media(element.media_id)
+            if media is None:
+                raise ValueError(f"Media {element.media_id} not found")
             parts.append(
                 {
                     "type": "image_url",
@@ -34,7 +38,7 @@ async def convert_llm_chat_message_to_openai_message(msg: LLMChatMessage, media_
         "content": parts
     }
 
-class OpenAIConfig(BaseModel):
+class OpenAIConfig(LLMBackendConfig):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
     model_config = ConfigDict(frozen=True)
@@ -97,7 +101,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         first_choice = choices[0] if choices else {}
         message = first_choice.get("message", {})
         
-        content = [
+        content: List[LLMChatContentPartType] = [
             LLMChatTextContent(text=message.get("content", ""))
         ]
         

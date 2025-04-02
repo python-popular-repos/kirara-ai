@@ -160,7 +160,6 @@ class FrpcManager:
                     if system != "windows":
                         os.chmod(frpc_path, 0o755)
                     
-                    self._frpc_path = frpc_path
                     if progress_callback:
                         await progress_callback(100)
                     self._get_frpc_version()

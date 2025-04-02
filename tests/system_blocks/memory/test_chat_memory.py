@@ -5,7 +5,8 @@ import pytest
 from kirara_ai.im.message import IMMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.message import LLMChatTextContent
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.memory.memory_manager import MemoryManager
 from kirara_ai.memory.registry import ComposerRegistry, DecomposerRegistry, ScopeRegistry
 from kirara_ai.workflow.implementations.blocks.memory.chat_memory import ChatMemoryQuery, ChatMemoryStore
@@ -74,8 +75,8 @@ async def test_chat_memory_query_async():
     
     # 注册到容器
     container.register(MemoryManager, MockMemoryManager())
-    container.register(ScopeRegistry, MockScopeRegistry())
-    container.register(DecomposerRegistry, MockDecomposerRegistry())
+    container.register(ScopeRegistry, MockScopeRegistry(container))
+    container.register(DecomposerRegistry, MockDecomposerRegistry(container))
     
     # 创建块 - 默认参数
     block = ChatMemoryQuery(scope_type="member")
@@ -104,22 +105,26 @@ async def test_chat_memory_store_async():
     
     # 创建 LLM 响应
     llm_resp = LLMChatResponse(
-        choices=[
-            {
-                "message": {
-                    "content": "这是 AI 的回复",
-                    "role": "assistant"
-                }
-            }
-        ],
+        message=Message(
+            content=[
+                LLMChatTextContent(
+                    text="这是 AI 的回复"
+                )
+            ],
+            role="assistant"
+        ),
         model="gpt-3.5-turbo",
-        usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+        usage=Usage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30
+        )
     )
     
     # 注册到容器
     container.register(MemoryManager, MockMemoryManager())
-    container.register(ScopeRegistry, MockScopeRegistry())
-    container.register(ComposerRegistry, MockComposerRegistry())
+    container.register(ScopeRegistry, MockScopeRegistry(container))
+    container.register(ComposerRegistry, MockComposerRegistry(container))
     
     # 创建块
     block = ChatMemoryStore(scope_type="member")

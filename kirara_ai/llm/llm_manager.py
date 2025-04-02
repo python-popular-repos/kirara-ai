@@ -94,19 +94,23 @@ class LLMManager:
         backend = next(
             (b for b in self.config.llms.api_backends if b.name == backend_name), None
         )
-        backend = self.backends.get(backend_name)
         if not backend:
             raise ValueError(f"Backend {backend_name} not found in config")
+        
+        backend_adapter = self.backends.get(backend_name)
+
+        if not backend_adapter:
+            raise ValueError(f"Backend {backend_name} not found")
 
         # 从所有模型中移除这个后端的适配器
         all_models = list(self.active_backends.keys())
         for model in all_models:
-            if backend in self.active_backends[model]:
-                self.active_backends[model].remove(backend)
+            if backend_adapter in self.active_backends[model]:
+                self.active_backends[model].remove(backend_adapter)
             if len(self.active_backends[model]) == 0:
                 self.active_backends.pop(model)
-        backend = self.backends.pop(backend_name)
-        self.event_bus.post(LLMAdapterUnloaded(backend_name=backend_name, adapter=backend))
+        backend_adapter = self.backends.pop(backend_name)
+        self.event_bus.post(LLMAdapterUnloaded(backend_name=backend_name, adapter=backend_adapter))
     async def reload_backend(self, backend_name: str):
         """
         重新加载指定的后端
@@ -177,7 +181,7 @@ class LLMManager:
             return []
         return list(matched_backends)
 
-    def get_llm_id_by_ability(self, ability: LLMAbility) -> str:
+    def get_llm_id_by_ability(self, ability: LLMAbility) -> Optional[str]:
         """
         根据指定的能力获取严格符合要求的 LLM 适配器列表。
         :param ability: 指定的能力。

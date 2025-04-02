@@ -19,7 +19,7 @@ class RandomChanceMatchRule(DispatchRule):
     config_class = RandomChanceRuleConfig
     type_name = "random"
 
-    def __init__(self, chance: float, workflow_registry: WorkflowRegistry, workflow_id: str):
+    def __init__(self, chance: int, workflow_registry: WorkflowRegistry, workflow_id: str):
         super().__init__(workflow_registry, workflow_id)
         self.chance = chance
 

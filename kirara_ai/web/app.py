@@ -68,7 +68,7 @@ custom_static_assets: dict[str, str] = {}
 def create_web_api_app(container: DependencyContainer) -> Quart:
     """创建 Web API 应用（Quart）"""
     app = Quart(__name__, static_folder=STATIC_FOLDER)
-    app.json.sort_keys = False
+    app.json.sort_keys = False # type: ignore
 
     # 注册蓝图
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -91,14 +91,14 @@ def create_web_api_app(container: DependencyContainer) -> Quart:
 
     # 在每个请求前将容器注入到上下文
     @app.before_request
-    async def inject_container():
+    async def inject_container(): # type: ignore
         g.container = container
 
     @app.before_websocket
-    async def inject_container():
+    async def inject_container_ws(): # type: ignore
         g.container = container
 
-    app.container = container
+    app.container = container # type: ignore
 
     return app
 
@@ -157,7 +157,7 @@ def create_app(container: DependencyContainer) -> FastAPI:
         if path in custom_static_assets:
             return await serve_custom_static(path, request)
 
-        skip_paths = [route.path for route in app.routes]
+        skip_paths = [route.path for route in app.routes] # type: ignore
 
         # 如果路径在跳过路径列表中，则直接返回
         if any(path == skip_path for skip_path in skip_paths):
@@ -235,8 +235,8 @@ class WebServer:
                 super().info(message, *args, **kwargs)
 
         # 使用新的过滤日志包装器
-        self.hypercorn_config._log.access_logger = FilteredLoggerWrapper(logger)
-        self.hypercorn_config._log.error_logger = HypercornLoggerWrapper(logger)
+        self.hypercorn_config._log.access_logger = FilteredLoggerWrapper(logger) # type: ignore
+        self.hypercorn_config._log.error_logger = HypercornLoggerWrapper(logger) # type: ignore
 
         # 挂载 Web API 应用
         self.mount_app("/backend-api", self.web_api_app)
@@ -262,7 +262,7 @@ class WebServer:
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
-        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait))
+        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait)) # type: ignore
         logger.info(
             f"监听地址：http://{self.config.web.host}:{self.config.web.port}/"
         )

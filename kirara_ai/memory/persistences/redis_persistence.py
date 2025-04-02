@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from kirara_ai.memory.entry import MemoryEntry
 
@@ -13,7 +13,7 @@ class RedisMemoryPersistence(MemoryPersistence):
 
     def __init__(
         self,
-        redis_url: str = None,
+        redis_url: Optional[str] = None,
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
@@ -48,9 +48,8 @@ class RedisMemoryPersistence(MemoryPersistence):
         data = self.redis.get(scope_key)
         if not data:
             return []
-
         # 反序列化
-        serialized_entries = json.loads(data, object_hook=memory_json_decoder)
+        serialized_entries = json.loads(data, object_hook=memory_json_decoder) # type: ignore
 
         return [
             MemoryEntry(

@@ -1,11 +1,13 @@
 import asyncio
+from typing import List
 
 import aiohttp
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.logger import get_logger
@@ -13,12 +15,18 @@ from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing import trace_llm_chat
 
 
-class OllamaConfig(BaseModel):
+class OllamaConfig(LLMBackendConfig):
     api_base: str = "http://localhost:11434"
     model_config = ConfigDict(frozen=True)
 
-async def resolv_media_ids(media_ids: list[str], media_manager: MediaManager) -> list[str]:
-    return [await media_manager.get_media(media_id).get_base64() for media_id in media_ids]
+async def resolv_media_ids(media_ids: list[str], media_manager: MediaManager) -> List[str]:
+    result = []
+    for media_id in media_ids:
+        media = media_manager.get_media(media_id)
+        if media is not None:
+            base64_data = await media.get_base64()
+            result.append(base64_data)
+    return result
 
 class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     def __init__(self, config: OllamaConfig):
@@ -48,7 +56,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             # 创建 Ollama 格式的消息
             message = {"role": msg.role, "content": text_content}
             if images:
-                message["images"] = loop.run_until_complete(resolv_media_ids(images, self.media_manager))
+                message["images"] = loop.run_until_complete(resolv_media_ids(images, self.media_manager)) # type: ignore
             
             messages.append(message)
 
@@ -79,7 +87,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             print(f"API Response: {response.text}")
             raise e
         # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
-        content = [LLMChatTextContent(text=response_data["message"]["content"])]
+        content: List[LLMChatContentPartType] = [LLMChatTextContent(text=response_data["message"]["content"])]
         return LLMChatResponse(
             model=req.model,
             message=Message(

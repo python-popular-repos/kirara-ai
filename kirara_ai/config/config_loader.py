@@ -1,7 +1,7 @@
 import os
 import shutil
 from functools import wraps
-from typing import Generic, Optional, TypeVar
+from typing import Optional, Type, TypeVar
 
 from pydantic import BaseModel, ValidationError
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
@@ -21,7 +21,7 @@ class ConfigLoader:
     yaml = YAML()
 
     @staticmethod
-    def load_config(config_path: str, config_class: Generic[T]) -> T:
+    def load_config(config_path: str, config_class: Type[T]) -> T:
         """
         从 YAML 文件中加载配置，并将其序列化为相应的配置对象。
         :param config_path: 配置文件路径。

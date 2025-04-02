@@ -14,8 +14,10 @@ from kirara_ai.workflow.core.block import Block, Input, Output, ParamMeta
 def scope_type_options_provider(container: DependencyContainer, block: Block) -> List[str]:
     return ["global", "member", "group"]
 
+
 def decomposer_name_options_provider(container: DependencyContainer, block: Block) -> List[str]:
     return ["default", "multi_element"]
+
 
 class ChatMemoryQuery(Block):
     name = "chat_memory_query"
@@ -24,7 +26,8 @@ class ChatMemoryQuery(Block):
             "chat_sender", "聊天对象", ChatSender, "要查询记忆的聊天对象"
         )
     }
-    outputs = {"memory_content": Output("memory_content", "记忆内容", List[ComposableMessageType], "记忆内容")}
+    outputs = {"memory_content": Output(
+        "memory_content", "记忆内容", List[ComposableMessageType], "记忆内容")}
     container: DependencyContainer
 
     def __init__(
@@ -47,7 +50,7 @@ class ChatMemoryQuery(Block):
         ] = "default",
     ):
         self.scope_type = scope_type
-        self.decomposer_name = decomposer_name
+        self.decomposer_name: str = decomposer_name or "default"
 
     def execute(self, chat_sender: ChatSender) -> Dict[str, Any]:
         self.memory_manager = self.container.resolve(MemoryManager)
@@ -62,7 +65,8 @@ class ChatMemoryQuery(Block):
 
         # 获取解析器实例
         decomposer_registry = self.container.resolve(DecomposerRegistry)
-        self.decomposer = decomposer_registry.get_decomposer(self.decomposer_name)
+        self.decomposer = decomposer_registry.get_decomposer(
+            self.decomposer_name)
 
         entries = self.memory_manager.query(self.scope, chat_sender)
         memory_content = self.decomposer.decompose(entries)
@@ -116,7 +120,7 @@ class ChatMemoryStore(Block):
 
         # 存储用户消息和LLM响应
         if user_msg is None:
-            composed_messages = []
+            composed_messages: List[ComposableMessageType] = []
         else:
             composed_messages = [user_msg]
         if llm_resp is not None:
@@ -126,7 +130,8 @@ class ChatMemoryStore(Block):
             self.logger.warning("No messages to store")
             return {}
         self.logger.debug(f"Composed messages: {composed_messages}")
-        memory_entries = self.composer.compose(user_msg.sender, composed_messages)
+        memory_entries = self.composer.compose(
+            user_msg.sender if user_msg else None, composed_messages)
         self.memory_manager.store(self.scope, memory_entries)
 
         return {}

@@ -1,11 +1,12 @@
 import asyncio
 import json
 
-from quart import Blueprint, current_app, jsonify, request, websocket
+from quart import Blueprint, g, jsonify, request, websocket
 
 from kirara_ai.internal import shutdown_event
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
+from kirara_ai.tracing.llm_tracer import LLMTracer
 from kirara_ai.tracing.manager import TracingManager
 from kirara_ai.web.auth.services import AuthService
 
@@ -17,7 +18,7 @@ logger = get_logger("Tracing-API")
 @tracing_bp.route("/types", methods=["GET"])
 async def get_trace_types():
     """获取所有可用的追踪器类型"""
-    container: DependencyContainer = current_app.container
+    container: DependencyContainer = g.container
     tracing_manager = container.resolve(TracingManager)
 
     return jsonify({
@@ -45,7 +46,7 @@ async def get_llm_traces():
     if status:
         filters["status"] = status
 
-    container: DependencyContainer = current_app.container
+    container: DependencyContainer = g.container
     tracing_manager = container.resolve(TracingManager)
     llm_tracer = tracing_manager.get_tracer("llm")
 
@@ -71,7 +72,7 @@ async def get_llm_traces():
 @tracing_bp.route("/llm/detail/<trace_id>", methods=["GET"])
 async def get_llm_trace_detail(trace_id: str):
     """获取特定LLM请求的详细信息"""
-    container: DependencyContainer = current_app.container
+    container: DependencyContainer = g.container
     tracing_manager = container.resolve(TracingManager)
     llm_tracer = tracing_manager.get_tracer("llm")
 
@@ -88,13 +89,13 @@ async def get_llm_trace_detail(trace_id: str):
 @tracing_bp.route("/llm/statistics", methods=["GET"])
 async def get_llm_statistics():
     """获取LLM统计信息"""
-    container: DependencyContainer = current_app.container
+    container: DependencyContainer = g.container
     tracing_manager = container.resolve(TracingManager)
     llm_tracer = tracing_manager.get_tracer("llm")
 
     if not llm_tracer:
         return jsonify({"error": "LLM tracer not found"}), 404
-
+    assert isinstance(llm_tracer, LLMTracer)
     stats = llm_tracer.get_statistics()
     return jsonify(stats)
 
@@ -102,7 +103,7 @@ async def get_llm_statistics():
 @tracing_bp.websocket("/ws")
 async def tracing_ws():
     """WebSocket接口，用于实时推送追踪日志"""
-    container: DependencyContainer = current_app.container
+    container: DependencyContainer = g.container
     tracing_manager = container.resolve(TracingManager)
     auth_service: AuthService = container.resolve(AuthService)
 

@@ -37,7 +37,7 @@ class TextReplaceBlock(Block):
     name = "text_replace_block"
     inputs = {
         "text": Input("text", "原始文本", str, "原始文本"),
-        "new_text": Input("new_text", "新文本", Any, "新文本"),
+        "new_text": Input("new_text", "新文本", Any, "新文本"),  # type: ignore
     }
     outputs = {"text": Output("text", "替换后的文本", str, "替换后的文本")}
 

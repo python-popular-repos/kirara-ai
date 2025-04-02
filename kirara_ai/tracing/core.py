@@ -4,7 +4,7 @@ import uuid
 from asyncio import Queue
 from typing import Any, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, String, asc
 
 from kirara_ai.database import Base, DatabaseManager
 from kirara_ai.events.event_bus import EventBus
@@ -132,7 +132,7 @@ class TracerBase(Generic[R], abc.ABC):
             
             # 应用排序
             if hasattr(self.record_class, order_by):
-                order_func = desc if order_desc else lambda x: x
+                order_func = desc if order_desc else asc
                 query = query.order_by(order_func(getattr(self.record_class, order_by)))
             
             # 应用分页

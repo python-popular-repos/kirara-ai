@@ -64,8 +64,8 @@ def _convert_media_to_api_item(media: Media) -> Optional[MediaItem]:
             size=metadata.size or 0,
             upload_time=metadata.created_at,
             source=metadata.source,
-            tags=metadata.tags,
-            references=metadata.references or []
+            tags=list(metadata.tags),
+            references=list(metadata.references),
         )
     )
 
@@ -98,10 +98,12 @@ async def list_media():
     
     # 如果有指定标签，继续筛选
     if search_params.tags and len(search_params.tags) > 0:
-        all_media_ids = [
-            media_id for media_id in all_media_ids
-            if any(tag in manager.get_metadata(media_id).tags for tag in search_params.tags)
-        ]
+        filtered_ids = []
+        for media_id in all_media_ids:
+            metadata = manager.get_metadata(media_id)
+            if metadata and any(tag in metadata.tags for tag in search_params.tags):
+                filtered_ids.append(media_id)
+        all_media_ids = filtered_ids
     
     # 如果有搜索关键词，继续筛选
     if search_params.query:
@@ -120,11 +122,11 @@ async def list_media():
             if metadata:
                 tz = pytz.timezone(g.container.resolve(GlobalConfig).system.timezone)
                 created_at = metadata.created_at.replace(tzinfo=tz)
-                start_date = search_params.start_date.replace(tzinfo=tz)
-                end_date = search_params.end_date.replace(tzinfo=tz)
-                if search_params.start_date and created_at < start_date:
+                start_date = search_params.start_date.replace(tzinfo=tz) if search_params.start_date else None
+                if start_date and created_at < start_date:
                     continue
-                if search_params.end_date and created_at > end_date:
+                end_date = search_params.end_date.replace(tzinfo=tz) if search_params.end_date else None
+                if end_date and created_at > end_date:
                     continue
                 filtered_ids.append(media_id)
         all_media_ids = filtered_ids
@@ -138,10 +140,9 @@ async def list_media():
     # 构建返回结果
     items = []
     for media_id in page_ids:
-        media = manager.get_media(media_id)
-        item = _convert_media_to_api_item(media)
-        if item:
-            items.append(item)
+        if media := manager.get_media(media_id):
+            if item:= _convert_media_to_api_item(media):
+                items.append(item)
     
     return MediaListResponse(
         items=items,

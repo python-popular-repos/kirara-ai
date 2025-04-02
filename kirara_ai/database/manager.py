@@ -51,6 +51,7 @@ class DatabaseManager:
         logger.info(f"Database initialized at {self.engine.url}")
 
     def _run_migrations(self):
+        assert self.engine is not None
         """运行数据库迁移"""
         try:
             # 获取 alembic.ini 的路径
@@ -89,6 +90,7 @@ class DatabaseManager:
         """获取数据库会话"""
         if not self.session_factory:
             self.initialize()
+        assert self.session_factory is not None
         return self.session_factory()
 
     def shutdown(self):

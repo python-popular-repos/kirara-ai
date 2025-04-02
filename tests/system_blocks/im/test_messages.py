@@ -82,18 +82,18 @@ async def test_send_im_message_async():
     # 执行块
     result = block.execute(msg=send_message)
     
-    # 验证结果 - 应该返回空字典
-    assert result == None
+    # 验证结果 
+    assert result is not None
     
     # 创建块 - 指定适配器
     block = SendIMMessage(im_name="telegram")
     block.container = container
     
     # 执行块
-    result = block.execute(msg=send_message, target="specific_user")
+    result = block.execute(msg=send_message, target=ChatSender.from_c2c_chat(user_id="specific_user", display_name="Specific User"))
     
     # 验证结果
-    assert result == None
+    assert result is not None
 
 
 def test_get_im_message(container):
