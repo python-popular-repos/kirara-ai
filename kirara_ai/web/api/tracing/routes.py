@@ -8,6 +8,7 @@ from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
 from kirara_ai.tracing.llm_tracer import LLMTracer
 from kirara_ai.tracing.manager import TracingManager
+from kirara_ai.web.auth.middleware import require_auth
 from kirara_ai.web.auth.services import AuthService
 
 tracing_bp = Blueprint("tracing", __name__, url_prefix="/api/tracing")
@@ -16,6 +17,7 @@ logger = get_logger("Tracing-API")
 
 
 @tracing_bp.route("/types", methods=["GET"])
+@require_auth
 async def get_trace_types():
     """获取所有可用的追踪器类型"""
     container: DependencyContainer = g.container
@@ -27,6 +29,7 @@ async def get_trace_types():
 
 
 @tracing_bp.route("/llm/traces", methods=["POST"])
+@require_auth
 async def get_llm_traces():
     """获取LLM追踪记录，支持筛选和分页"""
     # 获取查询参数
@@ -70,6 +73,7 @@ async def get_llm_traces():
 
 
 @tracing_bp.route("/llm/detail/<trace_id>", methods=["GET"])
+@require_auth
 async def get_llm_trace_detail(trace_id: str):
     """获取特定LLM请求的详细信息"""
     container: DependencyContainer = g.container
@@ -87,6 +91,7 @@ async def get_llm_trace_detail(trace_id: str):
 
 
 @tracing_bp.route("/llm/statistics", methods=["GET"])
+@require_auth
 async def get_llm_statistics():
     """获取LLM统计信息"""
     container: DependencyContainer = g.container

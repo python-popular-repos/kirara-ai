@@ -75,6 +75,12 @@ class WorkflowRegistry:
         self._workflows[full_name] = workflow_builder
         self.logger.info(f"Registered preset workflow: {full_name}")
     
+    def get_workflow(self, name: str, container: DependencyContainer) -> Optional[Workflow]:
+        builder = self._workflows.get(name)
+        if builder:
+            return builder.build(container)
+        return None
+    
     def get(
         self, name: str, container: Optional[DependencyContainer] = None
     ) -> Optional[WorkflowBuilder | Workflow]:
