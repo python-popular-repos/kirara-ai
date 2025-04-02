@@ -90,7 +90,7 @@ class HttpLegacyAdapter(IMAdapter):
         self.request_dic: Dict[str, V2Request] = {}
         self.logger = get_logger("HTTP-Legacy-Adapter")
 
-    def convert_to_message(self, raw_message: Any) -> IMMessage:
+    async def convert_to_message(self, raw_message: Any) -> IMMessage:
         data = raw_message
         username = data.get("username", "某人")
         message_text = data.get("message", "")
@@ -118,12 +118,12 @@ class HttpLegacyAdapter(IMAdapter):
 
     async def handle_message_elements(self, result: ResponseResult, message: IMMessage):
         for element in message.message_elements:
-            if isinstance(element, TextMessage):
-                result.message.append(element.text)
-            elif isinstance(element, VoiceMessage):
-                result.voice.append(element.url)
+            if isinstance(element, VoiceMessage):
+                result.voice.append(await element.get_base64_url())
             elif isinstance(element, ImageMessage):
-                result.image.append(element.url)
+                result.image.append(await element.get_base64_url())
+            else:
+                result.message.append(element.to_plain())
 
     def verify_api_key(self, request: Request) -> bool:
         """验证API密钥"""
@@ -159,7 +159,7 @@ class HttpLegacyAdapter(IMAdapter):
             if auth_response:
                 return auth_response
 
-            message = self.convert_to_message(data)
+            message = await self.convert_to_message(data)
             result = ResponseResult()
 
             async def handle_response(resp_message: IMMessage):
@@ -178,7 +178,7 @@ class HttpLegacyAdapter(IMAdapter):
 
             request_time = str(int(time.time() * 1000))
 
-            message = self.convert_to_message(data)
+            message = await self.convert_to_message(data)
             session_id = message.raw_message["session_id"]
 
             bot_request = V2Request(
@@ -246,9 +246,9 @@ class HttpLegacyAdapter(IMAdapter):
         port = self.config.port or 18560
         config.bind = [f"{host}:{port}"]
         config._log = Logger(config)
-        config._log.access_logger = HypercornLoggerWrapper(self.logger)
-        config._log.error_logger = HypercornLoggerWrapper(self.logger)
-        self.server_task = asyncio.create_task(serve(self.app, config))
+        config._log.access_logger = HypercornLoggerWrapper(self.logger)  # type: ignore
+        config._log.error_logger = HypercornLoggerWrapper(self.logger)  # type: ignore
+        self.server_task = asyncio.create_task(serve(self.app, config))  # type: ignore
 
     async def start(self):
         """启动HTTP服务器"""

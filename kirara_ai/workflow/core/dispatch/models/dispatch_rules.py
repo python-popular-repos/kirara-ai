@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -80,8 +80,7 @@ class CombinedDispatchRule(BaseModel):
         # 所有规则组都匹配成功
         return True
 
-    def get_workflow(self, container: DependencyContainer) -> Workflow:
+    def get_workflow(self, container: DependencyContainer) -> Optional[Workflow]:
         """获取该规则对应的工作流实例。"""
-        workflow = container.resolve(WorkflowRegistry).get(self.workflow_id, container)
-        assert isinstance(workflow, Workflow)
+        workflow = container.resolve(WorkflowRegistry).get_workflow(self.workflow_id, container)
         return workflow

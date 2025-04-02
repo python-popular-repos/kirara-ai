@@ -3,9 +3,8 @@ import base64
 
 import aiohttp
 import requests
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
@@ -38,7 +37,7 @@ IMAGE_MODAL_MODELS = [
     "gemini-2.0-flash-exp"
 ]
 
-class GeminiConfig(LLMBackendConfig):
+class GeminiConfig(BaseModel):
     api_key: str
     api_base: str = "https://generativelanguage.googleapis.com/v1beta"
     model_config = ConfigDict(frozen=True)

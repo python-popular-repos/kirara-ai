@@ -3,9 +3,8 @@ from typing import List
 
 import aiohttp
 import requests
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
@@ -38,7 +37,7 @@ async def convert_llm_chat_message_to_openai_message(msg: LLMChatMessage, media_
         "content": parts
     }
 
-class OpenAIConfig(LLMBackendConfig):
+class OpenAIConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
     model_config = ConfigDict(frozen=True)

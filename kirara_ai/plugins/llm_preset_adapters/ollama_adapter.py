@@ -3,9 +3,8 @@ from typing import List
 
 import aiohttp
 import requests
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
@@ -15,7 +14,7 @@ from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing import trace_llm_chat
 
 
-class OllamaConfig(LLMBackendConfig):
+class OllamaConfig(BaseModel):
     api_base: str = "http://localhost:11434"
     model_config = ConfigDict(frozen=True)
 
