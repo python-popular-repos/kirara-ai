@@ -8,7 +8,7 @@ from typing import Optional
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent
-from kirara_ai.llm.format.request import LLMChatRequest
+from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage, ToolCall, Function
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
@@ -41,17 +41,18 @@ async def convert_llm_chat_message_to_claude_message(messages: list[LLMChatMessa
         })
     return content
 
-def get_tool_call_info(content: list[dict]) -> Optional[list[ToolCall]]:
+def resolve_tool_calls(content: list[dict]) -> Optional[list[ToolCall]]:
     tool_calls = []
     for part in content:
         if part.get("type") == "tool_use":
             tool_calls.append(
                     ToolCall(
+                        model="claude",
                         id=part.get("id"),
                         type=part.get("type"),
                         function=Function(
                             name=part.get("name"),
-                            arguments=part.get("input"),
+                            arguments=part.get("input", None),
                         )
                     )
                 )
@@ -61,6 +62,16 @@ def get_tool_call_info(content: list[dict]) -> Optional[list[ToolCall]]:
     else:
         return None
 
+def convert_tools_to_claude_format(tools: list[Tool]) -> list[dict]:
+    return [{
+        "name": tool.name,
+        "description": tool.description,
+        "input_schema": {
+            "type": tool.parameters.type,
+            "properties": tool.parameters.properties,
+            "required": tool.parameters.required,
+        }
+    } for tool in tools]
 
 class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     
@@ -99,7 +110,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "top_p": req.top_p,
             "stream": req.stream,
             # claude tools格式中参数部分命名与openai api不同，不能简单使用model_dumps，在这里进行转换
-            "tools": [{"name": tool.name, "description": tool.description, "input_schema": tool.parameters} for tool in req.tools] if req.tools else None,
+            "tools": convert_tools_to_claude_format(req.tools) if req.tools else None,
             # claude默认如果使用了tools字段，这里需要指定tool_choice， claude默认为{"type": "auto"}. 
             # 可考虑后续给用户暴露此接口， 目前此处各模型定义不太统一
             "tool_choice": {"type": "auto"} if req.tools else None,
@@ -125,7 +136,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 media = loop.run_until_complete(self.media_manager.register_from_data(data, res["source"]["mime_type"], source="claude response"))
                 content.append(LLMChatImageContent(media_id=media))
             elif res["type"] == "tool_use":
-                data = content.append(LLMToolCallContent(id=res.get("id", None), name=res["name"], parameters=res.get("input", None)))
+                content.append(LLMToolCallContent(id=res.get("id", None), name=res["name"], parameters=res.get("input", None)))
 
         return LLMChatResponse(
             model=req.model,
@@ -139,7 +150,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 role=response_data.get("role"),
                 finish_reason=response_data.get("stop_reason", "stop"),
                 # claude tool_call混合在content字段中，需要提取
-                tool_calls = get_tool_call_info(response_data["content"]),
+                tool_calls = resolve_tool_calls(response_data["content"]),
             )
         )
 

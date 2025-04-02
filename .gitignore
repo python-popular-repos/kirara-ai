@@ -25,3 +25,4 @@ data/frpc/
 data/db
 .venv/
 uv.lock
+.mypy_cache/

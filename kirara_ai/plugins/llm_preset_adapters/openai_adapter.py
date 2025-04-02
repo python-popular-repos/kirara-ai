@@ -2,10 +2,12 @@ import asyncio
 
 import aiohttp
 import requests
+import json
 from pydantic import BaseModel, ConfigDict
+from typing import cast, Optional, Union
 
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolResultContent, LLMToolCallContent
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage, Function
 from kirara_ai.logger import get_logger
@@ -14,10 +16,12 @@ from kirara_ai.tracing import trace_llm_chat
 
 logger = get_logger("OpenAIAdapter")
 
-async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list[dict] | dict:
+async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list[dict]:
     if messages.role == "tool":
         # content字段为 list[LLMToolResultContent]
-        return [{"role": "tool", "tool_call_id": result.id, "content": result.content} for result in messages.content]
+        results = cast(list[LLMToolResultContent], messages.content) # 需要引入typing.case
+        # 保证 content 为一个字符串
+        return [{"role": "tool", "tool_call_id": result.id, "content": str(result.content)} for result in results]
     else:
         parts = []
         for element in messages.content:
@@ -31,22 +35,32 @@ async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaMa
                     }
                 })
             elif isinstance(element, LLMToolCallContent):
-                # 忽略tool_call_content，openai api不需要
+                # 忽略tool_call_content，openai api不需要。
+                # 保留这个判断分支，防止openai api接口出现变动。
                 continue
-        return {"role": messages.role, "content": parts}
+        return [{"role": messages.role, "content": parts}]
+    
 def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager, loop: asyncio.AbstractEventLoop) -> list[dict]:
-    """
-    gather 返回一个有序结果, 结果中遇到list类型对象, 应该原地展开list(注意保持结果顺序)。
-    """
-    results = loop.run_until_complete(asyncio.gather(*[convert_parts_factory(message, media_manager) for message in messages]))
-    temp = []
-    for result in results:
-        if isinstance(result, list):
-            temp.extend(result)
-        else:
-            temp.append(result)
-    return temp
-        
+    results = loop.run_until_complete(
+        asyncio.gather(*[convert_parts_factory(msg, media_manager) for msg in messages])
+    )
+    # 扁平化结果
+    return [item for sublist in results for item in sublist]
+
+def resolve_tool_calls_from_response(tool_calls: Optional[list[dict[str, Union[str, dict[str, str]]]]]):
+    if tool_calls is None:
+        return None
+    else:
+        return [ToolCall(
+            id=call["id"],
+            type=call["type"],
+            function=Function(
+                name=call["function"]["name"],
+                # openai api 的 arguments 值是一个长得像dict的字符串
+                arguments= json.loads(call["function"]["arguments"]) if call["function"].get("arguments", None) else None
+            )
+        ) for call in tool_calls]
+
 class OpenAIConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
@@ -81,6 +95,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "stream_options": req.stream_options,
             "temperature": req.temperature,
             "top_p": req.top_p,
+            # tool pydantic 模型按照 openai api 格式进行的建立。所以这里直接dump
             "tools": [tool.model_dump() for tool in req.tools] if req.tools else None,
             "tool_choice": "auto",
             "logprobs": req.logprobs,
@@ -105,18 +120,16 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         first_choice = choices[0] if choices else {}
         message: dict = first_choice.get("message", {})
         
-        # content字段为空必然llm请求调用tool
-        if message:= message.get("content", None):
-             content = [LLMChatTextContent(text=message)]
+        # 检测tool_calls字段是否存在和是否不为None. tool_call时content字段无有效信息，暂不记录
+        if tool_calls := message.get("tool_calls", None):
+            content = [LLMToolCallContent(
+                id=call["id"],
+                name=call["function"]["name"],
+                parameters=call["function"].get("parameters", None)
+            ) for call in tool_calls]
         else:
-            content = [
-                LLMToolCallContent(
-                    id=call["id"], 
-                    name=call["function"]["name"], 
-                    parameters=call["function"].get("parameters", None)
-                ) for call in message.get("content")
-            ]
-        
+            content = [LLMChatTextContent(text=message.get("content", ""))]
+
         usage_data = response_data.get("usage", {})
         
         return LLMChatResponse(
@@ -129,13 +142,15 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             message=Message(
                 content=content,
                 role=message.get("role", "assistant"),
-                tool_calls=[
-                    ToolCall(
-                        id=tool_call["id"], 
-                        type=tool_call["type"],
-                        function=Function(name = tool_call["function"]["name"], arguments=tool_call["function"].get("arguments", None))
-                    ) for tool_call in message.get("tool_calls")
-                ] if message.get("tool_calls", None) else None,
+                # tool_calls=[
+                #     ToolCall(
+                #         model = "openai",
+                #         id=tool_call["id"], 
+                #         type=tool_call["type"],
+                #         function=Function(name = tool_call["function"]["name"], arguments=tool_call["function"].get("arguments", None))
+                #     ) for tool_call in message.get("tool_calls")
+                # ] if message.get("tool_calls", None) else None,
+                tool_calls = resolve_tool_calls_from_response(response_data.get("tool_calls", None)),
                 finish_reason=first_choice.get("finish_reason", ""),
             ),
         )
