@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import aiohttp
 from packaging.version import Version
 from quart import Blueprint, g, jsonify, request
@@ -6,6 +8,7 @@ from kirara_ai.config.config_loader import CONFIG_FILE, ConfigLoader
 from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.logger import get_logger
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
+from kirara_ai.web.api.system.utils import get_installed_version
 
 from ...auth.middleware import require_auth
 from .models import InstallPluginRequest, PluginList, PluginResponse
@@ -13,6 +16,13 @@ from .models import InstallPluginRequest, PluginList, PluginResponse
 plugin_bp = Blueprint("plugin", __name__)
 
 logger = get_logger("WebServer")
+
+@lru_cache(maxsize=1)
+def get_meta_params() -> dict:
+    """获取元参数"""
+    return {
+        "kirara_version": get_installed_version(),
+    }
 
 
 def is_upgradable(installed_version: str, market_version: str) -> bool:
@@ -29,6 +39,8 @@ async def fetch_from_market(path: str, params: dict | None = None) -> dict:
     async with aiohttp.ClientSession(trust_env=True) as session:
         url = f"{plugin_market_base_url}/{path}"
         logger.info(f"Fetching from market: {url}")
+        params = params or {}
+        params.update(get_meta_params())
         async with session.get(url, params=params) as response:
             if response.status != 200:
                 raise Exception(f"插件市场请求失败: {response.status}")

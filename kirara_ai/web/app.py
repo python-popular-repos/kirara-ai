@@ -207,12 +207,16 @@ def create_app(container: DependencyContainer) -> FastAPI:
 class WebServer:
     app: FastAPI
     web_api_app: Quart
+    listen_host: str
+    listen_port: int
+    container: DependencyContainer
 
     def __init__(self, container: DependencyContainer):
         self.app = create_app(container)
         self.web_api_app = create_web_api_app(container)
         self.server_task = None
         self.shutdown_event = asyncio.Event()
+        self.container = container
         container.register(
             AuthService,
             FileBasedAuthService(
@@ -226,7 +230,6 @@ class WebServer:
         from hypercorn.logging import Logger
 
         self.hypercorn_config = Config()
-        self.hypercorn_config.bind = [f"{self.config.web.host}:{self.config.web.port}"]
         self.hypercorn_config._log = Logger(self.hypercorn_config)
 
         # 创建自定义的日志包装器，添加 URL 过滤
@@ -264,16 +267,26 @@ class WebServer:
 
     async def start(self):
         """启动Web服务器"""
+        # 确定最终使用的host和port
+        
+        if self.container.has("cli_args"):
+            cli_args = self.container.resolve("cli_args")
+            self.listen_host = cli_args.host
+            self.listen_port = cli_args.port
+        else:
+            self.listen_host = self.config.web.host
+            self.listen_port = self.config.web.port
+
+        self.hypercorn_config.bind = [f"{self.listen_host}:{self.listen_port}"]
+
         # 检查端口是否被占用
-        if not self._check_port_available(self.config.web.host, self.config.web.port):
-            error_msg = f"端口 {self.config.web.port} 已被占用，无法启动服务器，请修改端口或关闭其他占用端口的程序。"
+        if not self._check_port_available(self.listen_host, self.listen_port):
+            error_msg = f"端口 {self.listen_port} 已被占用，无法启动服务器，请修改端口或关闭其他占用端口的程序。"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
-        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait)) # type: ignore
-        logger.info(
-            f"监听地址：http://{self.config.web.host}:{self.config.web.port}/"
-        )
+        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait))
+        logger.info(f"监听地址：http://{self.listen_host}:{self.listen_port}/")
 
     async def stop(self):
         """停止Web服务器"""
