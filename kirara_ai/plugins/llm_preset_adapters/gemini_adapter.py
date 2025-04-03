@@ -1,16 +1,16 @@
 import asyncio
 import base64
+from typing import Any, Dict, List, Literal, Optional, cast
 
 import aiohttp
 import requests
-from pydantic import ConfigDict
-from typing import Optional, cast, Literal
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent, LLMChatContentPartType
+from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
+                                          LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
-from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage, ToolCall, Function
+from kirara_ai.llm.format.response import Function, LLMChatResponse, Message, ToolCall, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -18,16 +18,16 @@ from kirara_ai.tracing import trace_llm_chat
 SAFETY_SETTINGS = [{
     "category": "HARM_CATEGORY_HARASSMENT",
     "threshold": "BLOCK_NONE"
-},{
+}, {
     "category": "HARM_CATEGORY_HATE_SPEECH",
     "threshold": "BLOCK_NONE"
-},{
+}, {
     "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
     "threshold": "BLOCK_NONE"
-},{
+}, {
     "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
     "threshold": "BLOCK_NONE"
-},{
+}, {
     "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
     "threshold": "BLOCK_NONE"
 }]
@@ -39,14 +39,15 @@ IMAGE_MODAL_MODELS = [
     "gemini-2.0-flash-exp"
 ]
 
-class GeminiConfig(LLMBackendConfig):
+
+class GeminiConfig(BaseModel):
     api_key: str
     api_base: str = "https://generativelanguage.googleapis.com/v1beta"
     model_config = ConfigDict(frozen=True)
 
 
 async def convert_non_tool_message(msg: LLMChatMessage, media_manager: MediaManager) -> dict:
-    parts = []
+    parts: List[Dict[str, Any]] = []
     elements = cast(list[LLMChatContentPartType], msg.content)
     for element in elements:
         if isinstance(element, LLMChatTextContent):
@@ -88,8 +89,10 @@ async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_
                 }
             }
         } for element in elements]
-
+        # 此处按照 API 文档，不指定 role    
         return {"parts": parts}
+    else:
+        raise ValueError(f"Invalid role: {msg.role}")
 
 def resolve_function_call(calls: list[LLMChatContentPartType]) -> Optional[list[ToolCall]]:
     tool_calls = [
@@ -109,9 +112,9 @@ def convert_tools_to_gemini_format(tools: list[Tool]) -> list[dict[Literal["func
     }]
 
 class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
-    
+
     media_manager: MediaManager
-    
+
     def __init__(self, config: GeminiConfig):
         self.config = config
         self.logger = get_logger("GeminiAdapter")
@@ -123,10 +126,14 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-        
+
         # create a new asyncio loop to run the convert_llm_chat_message_to_gemini_message function
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
+        response_modalities = ["text"]
+        if req.model in IMAGE_MODAL_MODELS:
+            response_modalities.append("image")
 
         data = {
             "contents": loop.run_until_complete(asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages])),
@@ -136,33 +143,35 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 "topK": 40,
                 "maxOutputTokens": req.max_tokens,
                 "stopSequences": req.stop,
-                "responseModalities": ["text"],
+                "responseModalities": response_modalities,
             },
             "safetySettings": SAFETY_SETTINGS,
             "tools": convert_tools_to_gemini_format(req.tools) if req.tools else None,
         }
-        
-        if req.model in IMAGE_MODAL_MODELS:
-            data["generationConfig"]["responseModalities"] = ["text", "image"]
 
         # Remove None fields
         data = {k: v for k, v in data.items() if v is not None}
-        
+
         response = self._post_with_retry(api_url, json=data, headers=headers)
-        
+
         try:
             response_data = response.json()
         except Exception as e:
             print(f"API Response: {response.text}")
             raise e
-        content = []
+        content: List[LLMChatContentPartType] = []
         for part in response_data["candidates"][0]["content"]["parts"]:
-            part: dict[str, dict | str]
             if "text" in part:
                 content.append(LLMChatTextContent(text=part["text"]))
-            elif "inlineData" in part :
-                data = base64.b64decode(part["inlineData"]["data"])
-                media = loop.run_until_complete(self.media_manager.register_from_data(data=data, format=part["inlineData"]["mimeType"].removeprefix("image/"), source="gemini response"))
+            elif "inlineData" in part:
+                decoded_image_data = base64.b64decode(part["inlineData"]["data"])
+                media = loop.run_until_complete(
+                    self.media_manager.register_from_data(
+                        data=decoded_image_data,
+                        format=part["inlineData"]["mimeType"].removeprefix(
+                            "image/"),
+                        source="gemini response")
+                )
                 content.append(LLMChatImageContent(media_id=media))
             elif "functionCall" in part:
                 # tool_call 部分 gemini 不返回call_id
@@ -171,10 +180,14 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         return LLMChatResponse(
             model=req.model,
             usage=Usage(
-                prompt_tokens=response_data["usageMetadata"].get("promptTokenCount"),
-                cached_tokens=response_data["usageMetadata"].get("cachedContentTokenCount"),
-                completion_tokens=sum([modality.get("tokenCount", 0) for modality in response_data.get("promptTokensDetails", [])]),
-                total_tokens=response_data["usageMetadata"].get("totalTokenCount"),
+                prompt_tokens=response_data["usageMetadata"].get(
+                    "promptTokenCount"),
+                cached_tokens=response_data["usageMetadata"].get(
+                    "cachedContentTokenCount"),
+                completion_tokens=sum([modality.get(
+                    "tokenCount", 0) for modality in response_data.get("promptTokensDetails", [])]),
+                total_tokens=response_data["usageMetadata"].get(
+                    "totalTokenCount"),
             ),
             message=Message(
                 content=content,
@@ -209,7 +222,9 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 return response
             except requests.exceptions.RequestException as e:
                 if i == retry_count - 1:
-                    print(f"API Response: {response.text if 'response' in locals() else 'No response'}")
+                    print(
+                        f"API Response: {response.text if 'response' in locals() else 'No response'}")
                     raise e
                 else:
-                    self.logger.warning(f"Request failed, retrying {i+1}/{retry_count}: {e}")
+                    self.logger.warning(
+                        f"Request failed, retrying {i+1}/{retry_count}: {e}")

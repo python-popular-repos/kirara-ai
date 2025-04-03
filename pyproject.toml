@@ -75,4 +75,4 @@ default = true
 include_package_data = true
 
 [tool.mypy]
-disable_error_code = "override, assignment, annotation-unchecked"
+disable_error_code = "override, assignment, annotation-unchecked, import-untyped"

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Optional
 
 from kirara_ai.im.adapter import IMAdapter, UserProfileAdapter
@@ -36,6 +37,6 @@ class QueryUserProfileBlock(Block):
             )
 
         # 同步调用异步方法（在工作流执行器中会被正确处理）
-        profile = im_adapter.query_user_profile(chat_sender)
+        profile = asyncio.run(im_adapter.query_user_profile(chat_sender))  # type: ignore
 
         return {"profile": profile}

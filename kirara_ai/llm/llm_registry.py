@@ -1,7 +1,8 @@
 from enum import Enum
 from typing import Dict, List, Optional, Type
 
-from kirara_ai.config.global_config import LLMBackendConfig
+from pydantic import BaseModel
+
 from kirara_ai.llm.adapter import LLMBackendAdapter
 from kirara_ai.logger import get_logger
 
@@ -33,7 +34,7 @@ class LLMBackendRegistry:
     """
 
     _adapters: Dict[str, Type[LLMBackendAdapter]]
-    _configs: Dict[str, Type[LLMBackendConfig]]
+    _configs: Dict[str, Type[BaseModel]]
     _ability_registry: Dict[str, LLMAbility]
 
     def __init__(self):
@@ -46,7 +47,7 @@ class LLMBackendRegistry:
         self,
         adapter_type: str,
         adapter_class: Type[LLMBackendAdapter],
-        config_class: Type[LLMBackendConfig],
+        config_class: Type[BaseModel],
         ability: LLMAbility,
     ):
         """
@@ -75,7 +76,7 @@ class LLMBackendRegistry:
             None
         )
 
-    def get_config_class(self, adapter_type: str) -> Optional[Type[LLMBackendConfig]]:
+    def get_config_class(self, adapter_type: str) -> Optional[Type[BaseModel]]:
         """
         获取指定类型的配置类
         :param adapter_type: 适配器类型
