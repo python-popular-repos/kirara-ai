@@ -1,7 +1,8 @@
 import random
-from typing import Any, Dict
+from typing import Dict, Optional
 
 from kirara_ai.im.message import IMMessage, TextMessage
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.workflow.core.block import Block
 from kirara_ai.workflow.core.block.input_output import Input, Output
 
@@ -17,7 +18,7 @@ class GachaSimulator(Block):
         "response": Output("response", "响应消息", IMMessage, "响应消息包含抽卡结果")
     }
 
-    def __init__(self, rates: Dict[str, float] = None):
+    def __init__(self, rates: Optional[Dict[str, float]] = None):
         # 默认抽卡概率
         self.rates = rates or {"SSR": 0.03, "SR": 0.12, "R": 0.85}  # 3%  # 12%  # 85%
 
@@ -30,7 +31,7 @@ class GachaSimulator(Block):
                 return rarity
         return list(self.rates.keys())[-1]  # 保底
 
-    def execute(self, message: IMMessage) -> Dict[str, Any]:
+    def execute(self, message: IMMessage) -> Dict[str, IMMessage]:
         # 解析命令
         command = message.content
         is_ten_pull = "十连" in command
@@ -59,7 +60,7 @@ class GachaSimulator(Block):
 
         return {
             "response": IMMessage(
-                sender="<@bot>",
+                sender=ChatSender.get_bot_sender(),
                 message_elements=[TextMessage(result_text), TextMessage(stats_text)],
             )
         }

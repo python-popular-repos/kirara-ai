@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import magic
 
@@ -13,7 +13,7 @@ mime_remapping = {
 }
 
 
-def detect_mime_type(data: bytes = None, path: str = None) -> Tuple[str, MediaType, str]:
+def detect_mime_type(data: Optional[bytes] = None, path: Optional[str] = None) -> Tuple[str, MediaType, str]:
     """
     检测文件的MIME类型
     

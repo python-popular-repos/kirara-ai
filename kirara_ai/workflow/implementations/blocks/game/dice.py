@@ -3,6 +3,7 @@ import re
 from typing import Any, Dict
 
 from kirara_ai.im.message import IMMessage, TextMessage
+from kirara_ai.im.sender import ChatSender
 from kirara_ai.workflow.core.block import Block
 from kirara_ai.workflow.core.block.input_output import Input, Output
 
@@ -27,7 +28,7 @@ class DiceRoll(Block):
         if not match:
             return {
                 "response": IMMessage(
-                    sender="<@bot>",
+                    sender=ChatSender.get_bot_sender(),
                     message_elements=[TextMessage("Invalid dice command")],
                 )
             }
@@ -38,7 +39,7 @@ class DiceRoll(Block):
         if count > 100:  # 限制骰子数量
             return {
                 "response": IMMessage(
-                    sender="<@bot>",
+                    sender=ChatSender.get_bot_sender(),
                     message_elements=[TextMessage("Too many dice (max 100)")],
                 )
             }
@@ -54,6 +55,7 @@ class DiceRoll(Block):
 
         return {
             "response": IMMessage(
-                sender="<@bot>", message_elements=[TextMessage(details)]
+                sender=ChatSender.get_bot_sender(), 
+                message_elements=[TextMessage(details)]
             )
         }

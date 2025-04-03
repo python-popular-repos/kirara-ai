@@ -16,8 +16,8 @@ def get_package_metadata(package_name: str) -> Optional[Dict[str, Any]]:
         return {
             "name": dist.metadata["Name"],
             "version": dist.version,
-            "description": dist.metadata.get("Summary", ""),
-            "author": dist.metadata.get("Author", ""),
+            "description": dist.metadata["Summary"] if "Summary" in dist.metadata else "",
+            "author": dist.metadata["Author"] if "Author" in dist.metadata else "",
         }
     except PackageNotFoundError:
         return None

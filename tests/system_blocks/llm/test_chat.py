@@ -27,7 +27,6 @@ class MockLLM:
                    "completion_tokens": 20, "total_tokens": 30}
         )
 
-
 # 创建模拟的 LLMManager 类
 class MockLLMManager(LLMManager):
     def __init__(self):

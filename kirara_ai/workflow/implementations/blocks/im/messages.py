@@ -62,7 +62,7 @@ class SendIMMessage(Block):
             asyncio.AbstractEventLoop
         )
         loop.create_task(adapter.send_message(msg, target or src_msg.sender))
-        # return {"ok": True}
+        return {"ok": True}
 
 # IMMessage 转纯文本
 

@@ -28,8 +28,8 @@ class MediaMetadata:
         self.created_at = created_at or datetime.now()
         self.source = source
         self.description = description
-        self.tags = tags or []
-        self.references = references or set()
+        self.tags: List[str] = tags or []
+        self.references: Set[str] = references or set()
         self.url = url
         self.path = path
         
@@ -60,8 +60,10 @@ class MediaMetadata:
 
 
     @property
-    def mime_type(self) -> str:
+    def mime_type(self) -> Optional[str]:
         """获取 MIME 类型"""
+        if self.media_type is None or self.format is None:
+            return None
         return f"{self.media_type.value}/{self.format}"
     
     @classmethod

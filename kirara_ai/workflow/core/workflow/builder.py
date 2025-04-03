@@ -2,7 +2,7 @@ import importlib
 import random
 import string
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from ruamel.yaml import YAML
@@ -35,11 +35,10 @@ class BlockSpec:
 
     block_class: Type[Block]
     name: Optional[str] = None
-    kwargs: Dict[str, Any] = None
+    kwargs: Dict[str, Any] = field(default_factory=dict)
     wire_from: Optional[Union[str, List[str]]] = None
 
     def __post_init__(self):
-        self.kwargs = self.kwargs or {}
         if isinstance(self.wire_from, str):
             self.wire_from = [self.wire_from]
 
@@ -47,25 +46,45 @@ class BlockSpec:
 @dataclass
 class Node:
     spec: BlockSpec
-    name: Optional[str] = None
-    next_nodes: List["Node"] = None
-    merge_point: "Node" = None
-    parallel_nodes: List["Node"] = None
+    name: str
+    next_nodes: List["Node"] = field(default_factory=list)
+    merge_point: Optional["Node"] = None
+    parallel_nodes: List["Node"] = field(default_factory=list)
     is_parallel: bool = False
-    condition: Callable = None
+    condition: Optional[Callable] = None
     is_conditional: bool = False
     is_loop: bool = False
-    parent: "Node" = None
+    parent: Optional["Node"] = None
     position: Optional[Dict[str, int]] = None
-
-    def __post_init__(self):
-        self.next_nodes = self.next_nodes or []
-        if not self.name:
-            self.name = self.spec.name or f"{self.spec.block_class.__name__}_{id(self)}"
+    def __init__(
+        self,
+        spec: BlockSpec,
+        name: Optional[str] = None,
+        next_nodes: Optional[List["Node"]] = None,
+        merge_point: Optional["Node"] = None,
+        parallel_nodes: Optional[List["Node"]] = None,
+        is_parallel: bool = False,
+        condition: Optional[Callable] = None,
+        is_conditional: bool = False,
+        is_loop: bool = False,
+        parent: Optional["Node"] = None,
+        position: Optional[Dict[str, int]] = None,
+    ):
+        self.spec = spec
+        self.name = name or spec.name or f"{spec.block_class.__name__}_{id(self)}"
+        self.next_nodes = next_nodes or []
+        self.merge_point = merge_point
+        self.parallel_nodes = parallel_nodes or []
+        self.is_parallel = is_parallel
+        self.condition = condition
+        self.is_conditional = is_conditional
+        self.is_loop = is_loop
+        self.parent = parent
+        self.position = position
 
     def ancestors(self) -> List["Node"]:
         """获取所有祖先节点"""
-        result = []
+        result: List["Node"] = []
         current = self.parent
         while current:
             result.append(current)
@@ -155,11 +174,11 @@ class WorkflowBuilder:
     """
 
     def __init__(self, name: str):
-        self.id = None
-        self.name = name
-        self.description = ""
-        self.head: Node = None
-        self.current: Node = None
+        self.id: Optional[str] = None
+        self.name: str = name
+        self.description: str = ""
+        self.head: Optional[Node] = None
+        self.current: Optional[Node] = None
         self.nodes: List[Node] = []  # 存储所有节点
         self.nodes_by_name: Dict[str, Node] = {}
         self.wire_specs: List[Tuple[str, str, str, str]] = []  # (source_name, source_output, target_name, target_input)
@@ -215,7 +234,7 @@ class WorkflowBuilder:
         Returns:
             List of (output_name, input_name) pairs
         """
-        matches = []
+        matches: List[Tuple[str, str]] = []
         source_outputs = source_node.spec.block_class.outputs
         target_inputs = {name: target_node.spec.block_class.inputs[name] 
                         for name in available_inputs}
@@ -277,7 +296,7 @@ class WorkflowBuilder:
         return node
 
     def use(
-        self, block_class: Type[Block], name: str = None, **kwargs
+        self, block_class: Type[Block], name: Optional[str] = None, **kwargs: Any
     ) -> "WorkflowBuilder":
         spec = BlockSpec(block_class, name=name, kwargs=kwargs)
         node = self._create_node(spec)
@@ -288,9 +307,9 @@ class WorkflowBuilder:
     def chain(
         self,
         block_class: Type[Block],
-        name: str = None,
-        wire_from: List[str] = None,
-        **kwargs,
+        name: Optional[str] = None,
+        wire_from: Optional[List[str]] = None,
+        **kwargs: Any,
     ) -> "WorkflowBuilder":
         spec = BlockSpec(block_class, name=name, kwargs=kwargs, wire_from=wire_from)
         node = self._create_node(spec)
@@ -303,7 +322,7 @@ class WorkflowBuilder:
     def parallel(
         self, block_specs: List[Union[Type[Block], tuple]]
     ) -> "WorkflowBuilder":
-        parallel_nodes = []
+        parallel_nodes: List[Node] = []
 
         for block_spec in block_specs:
             spec = self._parse_block_spec(block_spec)
@@ -319,11 +338,12 @@ class WorkflowBuilder:
 
     def condition(self, condition_func: Callable) -> "WorkflowBuilder":
         """添加条件判断"""
+        assert self.current is not None
         self.current.condition = condition_func
         return self
 
     def if_then(
-        self, condition: Callable[[Dict[str, Any]], bool], name: str = None
+        self, condition: Callable[[Dict[str, Any]], bool], name: Optional[str] = None
     ) -> "WorkflowBuilder":
         """添加条件判断"""
         if not name:
@@ -347,14 +367,14 @@ class WorkflowBuilder:
 
     def else_then(self) -> "WorkflowBuilder":
         """添加else分支"""
-        if not self.current.is_conditional:
+        if not self.current or not self.current.is_conditional:
             raise ValueError("else_then must follow if_then")
         self.current = self.current.parent
         return self
 
     def end_if(self) -> "WorkflowBuilder":
         """结束条件分支"""
-        if not self.current.is_conditional:
+        if not self.current or not self.current.is_conditional:
             raise ValueError("end_if must close an if block")
         self.current = self.current.merge_point or self.current
         return self
@@ -362,7 +382,7 @@ class WorkflowBuilder:
     def loop(
         self,
         condition: Callable[[Dict[str, Any]], bool],
-        name: str = None,
+        name: Optional[str] = None,
         iteration_var: str = "index",
     ) -> "WorkflowBuilder":
         """开始一个循环"""
@@ -391,6 +411,9 @@ class WorkflowBuilder:
 
     def end_loop(self) -> "WorkflowBuilder":
         """结束循环"""
+        if self.current is None:
+            raise ValueError("end_loop must close a loop block")
+        
         if not any(n.is_loop for n in self.current.ancestors()):
             raise ValueError("end_loop must close a loop block")
 
@@ -413,10 +436,10 @@ class WorkflowBuilder:
 
     def build(self, container: DependencyContainer) -> Workflow:
         """构建工作流，在此阶段实例化所有 Block 并创建 Wire"""
-        blocks = []
-        wires = []
-        name_to_block = {}
-        name_to_node = {}
+        blocks: List[Block] = []
+        wires: List[Wire] = []
+        name_to_block: Dict[str, Block] = {}
+        name_to_node: Dict[str, Node] = {}
 
         # 首先实例化所有 Block
         for node in self.nodes:
@@ -458,7 +481,7 @@ class WorkflowBuilder:
 
     def _find_parallel_nodes(self, start_node: Node) -> List[Node]:
         """查找所有并行节点"""
-        parallel_nodes = []
+        parallel_nodes: List[Node] = []
         current = start_node
         while current:
             if current.is_parallel:
@@ -469,7 +492,7 @@ class WorkflowBuilder:
                 break
         return parallel_nodes
 
-    def update_position(self, name: str, position: Tuple[int, int]):
+    def update_position(self, name: str, position: Dict[str, int]):
         """更新节点的位置"""
         node = self.nodes_by_name[name]
         node.position = position
@@ -480,14 +503,14 @@ class WorkflowBuilder:
         yaml = YAML()
         yaml.indent(mapping=2, sequence=4, offset=2)
         yaml.width = 4096
-        workflow_data = {
+        workflow_data: Dict[str, Any] = {
             "name": self.name,
             "description": self.description,
             "blocks": [],
         }
 
         def serialize_node(node: Node) -> dict:
-            block_data = {
+            block_data: Dict[str, Any] = {
                 "type": registry.get_block_type_name(node.spec.block_class),
                 "name": node.name,
                 "params": node.spec.kwargs,
@@ -498,7 +521,7 @@ class WorkflowBuilder:
                 block_data["parallel"] = True
 
             # 添加连接信息
-            connected_to = []
+            connected_to: List[Dict[str, Any]] = []
             for wire in self.wire_specs:
                 if wire[0] == node.name:
                     # 使用 block.name 查找目标节点
@@ -550,7 +573,7 @@ class WorkflowBuilder:
         """
         yaml = YAML(typ="safe")
         with open(file_path, "r", encoding="utf-8") as f:
-            workflow_data = yaml.load(f)
+            workflow_data: Dict[str, Any] = yaml.load(f)
 
         builder: WorkflowBuilder = cls(workflow_data["name"])
         builder.description = workflow_data.get("description", "")
@@ -564,14 +587,16 @@ class WorkflowBuilder:
             if block_data.get("parallel"):
                 # 处理并行节点
                 parallel_blocks = [(block_class, block_data["name"], params)]
-                builder.parallel(parallel_blocks)
+                builder.parallel(parallel_blocks) # type: ignore
             else:
                 # 处理普通节点
                 if builder.head is None:
                     builder.use(block_class, name=block_data["name"], **params)
                 else:
                     builder.chain(block_class, name=block_data["name"], **params)
-            builder.update_position(block_data["name"], block_data["position"])
+            if block_data.get("position"):
+                builder.update_position(block_data["name"], block_data["position"])
+
         # 第二遍：建立连接
         builder.wire_specs = []
         for block_data in workflow_data["blocks"]:

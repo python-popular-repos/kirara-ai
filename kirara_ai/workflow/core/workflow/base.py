@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Optional
 
 from kirara_ai.workflow.core.block import Block
 
 
 class Workflow:
-    def __init__(self, name: str, blocks: List["Block"], wires: List["Wire"], id: str = None):
+    def __init__(self, name: str, blocks: List["Block"], wires: List["Wire"], id: Optional[str] = None):
         self.name = name
         self.blocks = blocks
         self.wires = wires

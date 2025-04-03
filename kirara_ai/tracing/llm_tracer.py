@@ -9,7 +9,7 @@ from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.ioc.inject import Inject
 from kirara_ai.llm.format.message import LLMChatMessage, LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message
 from kirara_ai.logger import get_logger
 from kirara_ai.tracing.core import TracerBase, generate_trace_id
 from kirara_ai.tracing.models import LLMRequestTrace
@@ -25,7 +25,7 @@ UNRECORD_REQUEST = [LLMChatMessage(
     ]
 )]
 
-UNRECORD_RESPONSE = LLMChatMessage(
+UNRECORD_RESPONSE = Message(
     role="assistant",
     content=[
         LLMChatTextContent(
@@ -42,7 +42,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
 
     @Inject()
     def __init__(self, container: DependencyContainer):
-        super().__init__(container, record_class=LLMRequestTrace)
+        super().__init__(container, record_class=LLMRequestTrace) # type: ignore
         self.config = container.resolve(GlobalConfig)
         
     def initialize(self):
@@ -61,11 +61,11 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         """将所有 pending 状态的任务转为 failed"""
         with self.db_manager.get_session() as session:
             pending_traces = session.query(LLMRequestTrace).filter(
-                LLMRequestTrace.status == "pending"
+                LLMRequestTrace.status == "pending" # type: ignore
             ).all()
             for trace in pending_traces:
-                trace.status = "failed"
-                trace.error = "Incomplete request"
+                trace.status = "failed" # type: ignore
+                trace.error = "Incomplete request" # type: ignore
             session.commit()
             return len(pending_traces)
             
@@ -74,7 +74,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         with self.db_manager.get_session() as session:
             days_ago = datetime.now() - timedelta(days=days)
             deleted_count = session.query(LLMRequestTrace).filter(
-                LLMRequestTrace.request_time < days_ago
+                LLMRequestTrace.request_time < days_ago # type: ignore
             ).delete()
             session.commit()
             return deleted_count
@@ -179,12 +179,12 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
         trace.update_from_event(event)
 
         # 保存记录到数据库
-        trace = self.save_trace_record(trace)
+        trace_dict = self.save_trace_record(trace)
 
         # 向WebSocket客户端广播消息
         self.broadcast_ws_message({
             "type": "new",
-            "data": trace
+            "data": trace_dict
         })
 
     def _on_request_complete(self, event: LLMRequestCompleteEvent):
@@ -233,10 +233,10 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
                 func.strftime('%Y-%m-%d', LLMRequestTrace.request_time).label('date'),
                 func.count(LLMRequestTrace.id).label('requests'),
                 func.sum(LLMRequestTrace.total_tokens).label('tokens'),
-                func.sum(case((LLMRequestTrace.status == 'success', 1), else_=0)).label('success'),
-                func.sum(case((LLMRequestTrace.status == 'failed', 1), else_=0)).label('failed')
+                func.sum(case((LLMRequestTrace.status == 'success', 1), else_=0)).label('success'), # type: ignore
+                func.sum(case((LLMRequestTrace.status == 'failed', 1), else_=0)).label('failed') # type: ignore
             ).filter(
-                LLMRequestTrace.request_time >= thirty_days_ago
+                LLMRequestTrace.request_time >= thirty_days_ago # type: ignore
             ).group_by(
                 func.strftime('%Y-%m-%d', LLMRequestTrace.request_time)
             ).order_by(
@@ -254,12 +254,12 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
             # 按模型分组统计（最近30天）
             model_stats = []
             model_counts = session.query(
-                LLMRequestTrace.model_id,
+                LLMRequestTrace.model_id, # type: ignore
                 func.count(LLMRequestTrace.id).label('count'),
                 func.sum(LLMRequestTrace.total_tokens).label('tokens'),
                 func.avg(LLMRequestTrace.duration).label('avg_duration')
-            ).filter(
-                LLMRequestTrace.request_time >= thirty_days_ago
+            ).filter( # type: ignore
+                LLMRequestTrace.request_time >= thirty_days_ago # type: ignore
             ).group_by(
                 LLMRequestTrace.model_id
             ).all()
@@ -275,13 +275,12 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
             # 按后端分组统计（最近30天）
             backend_stats = []
             backend_counts = session.query(
-                LLMRequestTrace.backend_name,
+                LLMRequestTrace.backend_name, # type: ignore
                 func.count(LLMRequestTrace.id).label('count'),
                 func.sum(LLMRequestTrace.total_tokens).label('tokens'),
                 func.avg(LLMRequestTrace.duration).label('avg_duration')
-            ).filter(
-                
-                LLMRequestTrace.request_time >= thirty_days_ago
+            ).filter( # type: ignore
+                LLMRequestTrace.request_time >= thirty_days_ago # type: ignore
             ).group_by(
                 LLMRequestTrace.backend_name
             ).all()
@@ -301,7 +300,7 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
                 func.count(LLMRequestTrace.id).label('requests'),
                 func.sum(LLMRequestTrace.total_tokens).label('tokens')
             ).filter(
-                LLMRequestTrace.request_time >= one_day_ago
+                LLMRequestTrace.request_time >= one_day_ago # type: ignore
             ).group_by(
                 func.strftime('%Y-%m-%d %H:00:00', LLMRequestTrace.request_time)
             ).order_by(

@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
+from kirara_ai.workflow.core.workflow.base import Workflow
 from kirara_ai.workflow.core.workflow.builder import WorkflowBuilder
 
 
@@ -73,17 +74,17 @@ class WorkflowRegistry:
             return
         self._workflows[full_name] = workflow_builder
         self.logger.info(f"Registered preset workflow: {full_name}")
-
+    
     def get(
-        self, name: str, container: DependencyContainer = None
-    ) -> Optional[WorkflowBuilder]:
+        self, name: str, container: Optional[DependencyContainer] = None
+    ) -> Optional[WorkflowBuilder | Workflow]:
         """获取工作流构建器或实例"""
         builder = self._workflows.get(name)
         if builder and container:
             return builder.build(container)
         return builder
 
-    def load_workflows(self, workflows_dir: str = None):
+    def load_workflows(self, workflows_dir: Optional[str] = None):
         """从指定目录加载所有工作流定义"""
         workflows_dir = workflows_dir or self.WORKFLOWS_DIR
         if not os.path.exists(workflows_dir):

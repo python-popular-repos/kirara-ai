@@ -1,13 +1,15 @@
 import asyncio
+from typing import List
 
 import aiohttp
 import requests
 import json
-from pydantic import BaseModel, ConfigDict
-from typing import cast, Optional, Union
+from pydantic import  ConfigDict
+from typing import cast, Union, Optional
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMChatContentPartType, LLMToolCallContent, LLMToolResultContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage, Function
 from kirara_ai.logger import get_logger
@@ -18,20 +20,24 @@ logger = get_logger("OpenAIAdapter")
 
 async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list[dict]:
     if messages.role == "tool":
-        # content字段为 list[LLMToolResultContent]
-        results = cast(list[LLMToolResultContent], messages.content) # 需要引入typing.case
+        # typing.cast 指定类型，避免mypy报错
+        results = cast(list[LLMToolResultContent], messages.content)
         # 保证 content 为一个字符串
         return [{"role": "tool", "tool_call_id": result.id, "content": str(result.content)} for result in results]
     else:
         parts = []
-        for element in messages.content:
+        elements = cast(list[LLMChatContentPartType], messages.content)
+        for element in elements:
             if isinstance(element, LLMChatTextContent):
                 parts.append(element.model_dump(mode="json"))
             elif isinstance(element, LLMChatImageContent):
+                media = media_manager.get_media(element.media_id)
+                if media is None:
+                    raise ValueError(f"Media {element.media_id} not found")
                 parts.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": await media_manager.get_media(element.media_id).get_base64_url()
+                        "url": await media.get_base64_url()
                     }
                 })
             elif isinstance(element, LLMToolCallContent):
@@ -39,12 +45,12 @@ async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaMa
                 # 保留这个判断分支，防止openai api接口出现变动。
                 continue
         return [{"role": messages.role, "content": parts}]
-    
+
 def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager, loop: asyncio.AbstractEventLoop) -> list[dict]:
     results = loop.run_until_complete(
         asyncio.gather(*[convert_parts_factory(msg, media_manager) for msg in messages])
     )
-    # 扁平化结果
+    # 扁平化结果, 展开所有列表
     return [item for sublist in results for item in sublist]
 
 def resolve_tool_calls_from_response(tool_calls: Optional[list[dict[str, Union[str, dict[str, str]]]]]):
@@ -61,7 +67,7 @@ def resolve_tool_calls_from_response(tool_calls: Optional[list[dict[str, Union[s
             )
         ) for call in tool_calls]
 
-class OpenAIConfig(BaseModel):
+class OpenAIConfig(LLMBackendConfig):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
     model_config = ConfigDict(frozen=True)

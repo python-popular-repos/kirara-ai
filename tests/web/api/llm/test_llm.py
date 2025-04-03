@@ -9,8 +9,9 @@ from kirara_ai.config.global_config import GlobalConfig, LLMBackendConfig, WebCo
 from kirara_ai.events.event_bus import EventBus
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.adapter import LLMBackendAdapter
+from kirara_ai.llm.format.message import LLMChatTextContent
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse
+from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
 from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMAbility, LLMBackendRegistry
 from kirara_ai.web.app import WebServer
@@ -42,9 +43,18 @@ class TestAdapter(LLMBackendAdapter):
 
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
         return LLMChatResponse(
-            content="Test response",
+            message=Message(
+                content=[
+                    LLMChatTextContent(text="Test response")
+                ],
+                role="assistant"
+            ),
             model=self.config.model,
-            usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+            usage=Usage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30
+            ),
         )
 
 

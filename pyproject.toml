@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kirara-ai"
-version = "3.1.1"
+version = "3.2.0a1"
 authors = [
     { name="Lss233", email="i@lss233.com" },
 ]
@@ -13,9 +13,12 @@ readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+
 dependencies = [
     "pydantic>=2.0.0",
     "pydantic-core>=2.27.2",
@@ -71,7 +74,5 @@ default = true
 [options]
 include_package_data = true
 
-[dependency-groups]
-dev = [
-    "mypy>=1.15.0",
-]
+[tool.mypy]
+disable_error_code = "override, assignment, annotation-unchecked"

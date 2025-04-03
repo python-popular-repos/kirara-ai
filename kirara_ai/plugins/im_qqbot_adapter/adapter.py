@@ -2,7 +2,7 @@ import asyncio
 import base64
 import functools
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 import ymbotpy as botpy
 import ymbotpy.message
@@ -11,7 +11,8 @@ from ymbotpy.http import Route as BotpyRoute
 from ymbotpy.types.message import Media as BotpyMedia
 
 from kirara_ai.im.adapter import BotProfileAdapter, IMAdapter
-from kirara_ai.im.message import ImageMessage, IMMessage, MentionElement, TextMessage, VideoElement, VoiceMessage
+from kirara_ai.im.message import (ImageMessage, IMMessage, MentionElement, MessageElement, TextMessage, VideoElement,
+                                  VoiceMessage)
 from kirara_ai.im.profile import UserProfile
 from kirara_ai.im.sender import ChatSender, ChatType
 from kirara_ai.logger import get_logger
@@ -54,7 +55,7 @@ class QQBotConfig(BaseModel):
 async def patched_post_file(
     self,
     file_type: int,
-    file_data: str,
+    file_data: bytes,
     openid: Optional[str] = None,
     group_openid: Optional[str] = None
 ) -> BotpyMedia:
@@ -97,11 +98,11 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
         )
         self.loop = self._loop
         self.user = None
-        self.api.patched_post_c2c_file = patched_post_file
-        self.api.patched_post_group_file = patched_post_file
 
-    def convert_to_message(self, raw_message: ymbotpy.message.BaseMessage) -> IMMessage:
+    async def convert_to_message(self, raw_message: ymbotpy.message.BaseMessage) -> IMMessage:
         if isinstance(raw_message, ymbotpy.message.GroupMessage):
+            assert raw_message.author.member_openid is not None
+            assert raw_message.group_openid is not None
             sender = ChatSender.from_group_chat(
                 raw_message.author.member_openid, raw_message.group_openid, 'QQ 用户')
         elif isinstance(raw_message, ymbotpy.message.C2CMessage):
@@ -117,16 +118,24 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
             "message_seq": raw_message.msg_seq,
             "timestamp": raw_message.timestamp,
         }
-        elements = []
+        elements: List[MessageElement] = []
         if raw_message.content.strip():
             elements.append(TextMessage(text=raw_message.content.lstrip()))
         for attachment in raw_message.attachments:
             if attachment.content_type.startswith('image/'):
-                elements.append(ImageMessage(
-                    url=attachment.url, format=attachment.content_type.removeprefix('image/')))
+                elements.append(
+                    ImageMessage(
+                        url=attachment.url,
+                        format=attachment.content_type.removeprefix('image/')
+                    )
+                )
             elif attachment.content_type.startswith('audio'):
-                elements.append(VoiceMessage(url=attachment.url,
-                                format=attachment.filename.split('.')[-1]))
+                elements.append(
+                    VoiceMessage(
+                        url=attachment.url,
+                        format=attachment.filename.split('.')[-1]
+                    )
+                )
         return IMMessage(sender=sender, message_elements=elements, raw_message=raw_dict)
 
     async def send_message(self, message: IMMessage, recipient: ChatSender):
@@ -135,13 +144,20 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
         :param message: 要发送的消息对象。
         :param recipient: 接收消息的目标对象。
         """
-        msg_id = recipient.raw_metadata.get('message_id')
+        if recipient.raw_metadata is None or recipient.raw_metadata.get('message_id') is None:
+            raise ValueError("Unable to retreive send_message info from metadata")
+        
+        msg_id = recipient.raw_metadata['message_id']
+        
         if recipient.chat_type == ChatType.C2C:
+            assert recipient.user_id is not None
             post_message_func = functools.partial(
                 self.api.post_c2c_message, openid=recipient.user_id, msg_id=msg_id)
             upload_func = functools.partial(
                 patched_post_file, self.api, openid=recipient.user_id)
+            
         elif recipient.chat_type == ChatType.GROUP:
+            assert recipient.group_id is not None
             post_message_func = functools.partial(
                 self.api.post_group_message, group_openid=recipient.group_id, msg_id=msg_id)
             upload_func = functools.partial(
@@ -173,7 +189,7 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
             发送文本消息。
             :param text: 要发送的文本内容。
             """
-            await post_message_func(content=text, msg_seq=msg_seq)
+            await post_message_func(content=text, msg_seq=msg_seq) # type: ignore
 
         # 单次循环处理所有元素
         for element in message.message_elements:
@@ -205,7 +221,7 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
                 elif isinstance(element, VideoElement):
                     file_type = 2
                 media = await upload_func(file_type=file_type, file_data=await element.get_data())
-                await post_message_func(media=media, msg_seq=msg_seq, msg_type=7)
+                await post_message_func(media=media, msg_seq=msg_seq, msg_type=7) # type: ignore
                 msg_seq += 1
         # 补充解释性文本
         if url_replaced:
@@ -223,8 +239,8 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
         :param message: 接收到的消息对象。
         """
         self.logger.debug(f"收到 C2C 消息: {message}")
-        message = self.convert_to_message(message)
-        await self.dispatcher.dispatch(self, message)
+        im_message = await self.convert_to_message(message)
+        await self.dispatcher.dispatch(self, im_message)
 
     async def on_group_at_message_create(self, message: ymbotpy.message.GroupMessage):
         """
@@ -232,11 +248,11 @@ class QQBotAdapter(botpy.WebHookClient, IMAdapter, BotProfileAdapter):
         :param message: 接收到的消息对象。
         """
         self.logger.debug(f"收到群消息: {message}")
-        message = self.convert_to_message(message)
+        im_message = await self.convert_to_message(message)
         # 这个逆天的 Webhook 居然不包含 mention 字段，这里要手动补上
-        message.message_elements.append(
+        im_message.message_elements.append(
             MentionElement(target=ChatSender.get_bot_sender()))
-        await self.dispatcher.dispatch(self, message)
+        await self.dispatcher.dispatch(self, im_message)
 
     async def get_bot_profile(self) -> Optional[UserProfile]:
         """

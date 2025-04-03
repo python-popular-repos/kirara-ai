@@ -1,7 +1,8 @@
-from typing import Literal, List, Optional, Union, Any
+from typing import Literal, List, Optional, Union, Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, model_validator
 
+RoleType = Literal["system", "user", "assistant"]
 
 class LLMChatTextContent(BaseModel):
     type: Literal["text"] = "text"
@@ -39,11 +40,23 @@ class LLMToolResultContent(BaseModel):
 
 LLMChatContentPartType = Union[LLMChatTextContent, LLMChatImageContent, LLMToolCallContent]
 RoleTypes = Literal["user", "assistant", "system", "tool"]
-NormalTypes = Literal["user", "assistant", "system"]
 
 class LLMChatMessage(BaseModel):
     """
     当 role 为 "tool" 时，content 内部只能为 list[LLMToolResultContent]
     """
-    content: Union[List[LLMChatContentPartType], List[LLMToolResultContent]] = Field(discriminator="type")
+    content: Union[List[LLMChatContentPartType], List[LLMToolResultContent]]
     role: RoleTypes
+
+    @model_validator(mode="after")
+    def check_content_type(self) -> Self:
+        # 此装饰器将在 model 实例化后执行，`mode = "after"`
+        # 用于检查 content 字段的类型是否符合 role 要求
+        match self.role:
+            case "user" | "assistant" | "system":
+                if not isinstance(list[LLMChatContentPartType], self.content):
+                    raise ValueError(f"content must be a list of LLMChatContentPartType, when role is {self.role}")
+            case "tool":
+                if not isinstance(list[LLMToolResultContent], self.content):
+                    raise ValueError("content must be a list of LLMToolResultContent, when role is 'tool'")
+        return self

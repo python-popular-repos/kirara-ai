@@ -29,8 +29,8 @@ class WorkflowExecutor:
         self.workflow = workflow
         self.registry = registry
         self.event_bus = event_bus
-        self.results = defaultdict(dict)
-        self.variables = {}  # 存储工作流变量
+        self.results: Dict[str, Any] = {}
+        self.variables: Dict[str, Any] = {}  # 存储工作流变量
         self.logger.info(
             f"Initializing WorkflowExecutor for workflow '{workflow.name}'"
         )

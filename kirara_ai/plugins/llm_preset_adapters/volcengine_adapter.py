@@ -11,8 +11,8 @@ from .openai_adapter import OpenAIAdapter, OpenAIConfig
 
 class VolcengineConfig(OpenAIConfig):
     api_base: str = "https://ark.cn-beijing.volces.com/api/v3"
-    access_key_id: str = Field(default="", env="VOLCENGINE_ACCESS_KEY_ID", description="火山云引擎 API 密钥 ID，用于获取模型列表")
-    access_key_secret: str = Field(default="", env="VOLCENGINE_ACCESS_KEY_SECRET", description="火山云引擎 API 密钥，用于获取模型列表")
+    access_key_id: str = Field(description="火山云引擎 API 密钥 ID，用于获取模型列表")
+    access_key_secret: str = Field(description="火山云引擎 API 密钥，用于获取模型列表")
 
 def generate_volcengine_signature(access_key_id, access_key_secret, method, path, query, body=None):
     """生成火山引擎API所需的HMAC-SHA256签名"""
@@ -96,6 +96,8 @@ def normalize_query(params):
     return query[:-1].replace("+", "%20") if query else ""
 
 class VolcengineAdapter(OpenAIAdapter):
+    config: VolcengineConfig
+    
     def __init__(self, config: VolcengineConfig):
         super().__init__(config)
 

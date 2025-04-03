@@ -34,7 +34,7 @@ class LLMBackendRegistry:
 
     _adapters: Dict[str, Type[LLMBackendAdapter]]
     _configs: Dict[str, Type[LLMBackendConfig]]
-    _ability_registry: Dict[str, int]
+    _ability_registry: Dict[str, LLMAbility]
 
     def __init__(self):
         self._adapters = {}

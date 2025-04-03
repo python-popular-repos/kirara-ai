@@ -1,10 +1,10 @@
 import re
 from datetime import datetime, timedelta
-from typing import List, Union
+from typing import List, Optional, Union
 
 from kirara_ai.im.message import IMMessage, MediaMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent
+from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, RoleType
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.memory.entry import MemoryEntry
@@ -17,13 +17,13 @@ def drop_think_part(text: str) -> str:
 
 class DefaultMemoryComposer(MemoryComposer):
     def compose(
-        self, sender: ChatSender, message: List[ComposableMessageType]
+        self, sender: Optional[ChatSender], message: List[ComposableMessageType]
     ) -> MemoryEntry:
         composed_message = ""
         media_ids = []
         for msg in message:
             if isinstance(msg, IMMessage):
-                composed_message += f"{sender.display_name} 说: \n"
+                composed_message += f"{msg.sender.display_name} 说: \n"
                 for element in msg.message_elements:
                     if isinstance(element, MediaMessage):
                         desc = element.get_description()
@@ -40,14 +40,14 @@ class DefaultMemoryComposer(MemoryComposer):
                         composed_message += f"{drop_think_part(part.text)}\n"
                     elif isinstance(part, LLMChatImageContent):
                         media = self.container.resolve(MediaManager).get_media(part.media_id)
-                        desc = media.description
+                        desc = media.description if media else ""
                         composed_message += f"<media_msg id={part.media_id} desc=\"{desc}\" />\n"
                         media_ids.append(part.media_id)
 
         composed_message = composed_message.strip()
         composed_at = datetime.now()
         return MemoryEntry(
-            sender=sender,
+            sender=sender or ChatSender.get_bot_sender(),
             content=composed_message,
             timestamp=composed_at,
             metadata={
@@ -57,12 +57,12 @@ class DefaultMemoryComposer(MemoryComposer):
 
 
 class DefaultMemoryDecomposer(MemoryDecomposer):
-    def decompose(self, entries: List[MemoryEntry]) -> List[str]:
+    def decompose(self, entries: List[MemoryEntry]) -> List[ComposableMessageType]:
         if len(entries) == 0:
             return [self.empty_message]
 
         # 7秒前，<记忆内容>
-        memory_texts = []
+        memory_texts: List[ComposableMessageType] = []
         for entry in entries[-10:]:
             time_diff = datetime.now() - entry.timestamp
             time_str = self.get_time_str(time_diff)
@@ -124,7 +124,7 @@ class MultiElementDecomposer(MemoryDecomposer):
 
         return decomposed_messages
 
-    def create_llm_chat_message(self, content: str, role: str, sender: ChatSender) -> Union[LLMChatMessage, None]:
+    def create_llm_chat_message(self, content: str, role: RoleType, sender: ChatSender) -> Union[LLMChatMessage, None]:
         message_content: List[Union[LLMChatTextContent, LLMChatImageContent]] = []
 
         # 使用正则表达式提取 <media_msg> 标签

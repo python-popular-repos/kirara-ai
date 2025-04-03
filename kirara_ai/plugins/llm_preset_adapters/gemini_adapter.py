@@ -3,9 +3,10 @@ import base64
 
 import aiohttp
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from typing import Optional, cast, Literal
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent, LLMChatContentPartType
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
@@ -38,7 +39,7 @@ IMAGE_MODAL_MODELS = [
     "gemini-2.0-flash-exp"
 ]
 
-class GeminiConfig(BaseModel):
+class GeminiConfig(LLMBackendConfig):
     api_key: str
     api_base: str = "https://generativelanguage.googleapis.com/v1beta"
     model_config = ConfigDict(frozen=True)
@@ -52,9 +53,11 @@ async def convert_non_tool_message(msg: LLMChatMessage, media_manager: MediaMana
             parts.append({"text": element.text})
         elif isinstance(element, LLMChatImageContent):
             media = media_manager.get_media(element.media_id)
+            if media is None:
+                raise ValueError(f"Media {element.media_id} not found")
             parts.append({
                 "inline_data": {
-                    "mime_type": media.mime_type,
+                    "mime_type": str(media.mime_type),
                     "data": await media.get_base64()
                 }
             })
@@ -88,7 +91,7 @@ async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_
 
         return {"parts": parts}
 
-def resolve_function_call(calls: list) -> Optional[list[ToolCall]]:
+def resolve_function_call(calls: list[LLMChatContentPartType]) -> Optional[list[ToolCall]]:
     tool_calls = [
         ToolCall(
             model="gemini",
@@ -102,15 +105,7 @@ def resolve_function_call(calls: list) -> Optional[list[ToolCall]]:
 
 def convert_tools_to_gemini_format(tools: list[Tool]) -> list[dict[Literal["function_declarations"], list[dict]]]:
     return [{
-        "function_declarations": [{
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": {
-                "type": tool.parameters.type,
-                "properties": tool.parameters.properties,
-                "required": tool.parameters.required
-            }
-        } for tool in tools]
+        "function_declarations": [tool.model_dump(exclude={"strict": True, "parameters": {"additionalProperties": True}}) for tool in tools]
     }]
 
 class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
@@ -206,7 +201,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                     if "generateContent" in model["supportedGenerationMethods"]
                 ]
 
-    def _post_with_retry(self, url: str, json: dict, headers: dict, retry_count: int = 3) -> requests.Response:
+    def _post_with_retry(self, url: str, json: dict, headers: dict, retry_count: int = 3) -> requests.Response: # type: ignore
         for i in range(retry_count):
             try:
                 response = requests.post(url, json=json, headers=headers)

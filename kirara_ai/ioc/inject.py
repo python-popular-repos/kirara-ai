@@ -17,7 +17,7 @@ def get_all_attributes(cls):
 
 
 class Inject:
-    def __init__(self, container: DependencyContainer = None):
+    def __init__(self, container: Optional[DependencyContainer] = None):
         self.container = container
 
     def create(self, target: type):
@@ -31,14 +31,11 @@ class Inject:
         if isinstance(target, type):
             return self.inject_class(target)
         # 如果修饰的是一个函数
-        elif isinstance(target, Callable):
+        elif callable(target):
             return self.inject_function(target)
-        # 如果修饰的是一个属性
-        elif isinstance(target, property):
-            return self.inject_property(target)
         else:
             raise TypeError(
-                "Inject can only be used on classes, functions, or properties."
+                "Inject can only be used on classes, functions."
             )
 
     def inject_class(self, cls: Type):

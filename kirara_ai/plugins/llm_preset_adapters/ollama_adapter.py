@@ -1,18 +1,33 @@
 import asyncio
+from typing import List
 
 import aiohttp
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from typing import Optional, cast, Literal
 
+from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent, LLMChatMessage, LLMChatContentPartType
+from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageContent, LLMChatTextContent, LLMToolCallContent, LLMToolResultContent, LLMChatMessage, LLMChatContentPartType
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage, ToolCall, Function
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing import trace_llm_chat
 
+
+class OllamaConfig(LLMBackendConfig):
+    api_base: str = "http://localhost:11434"
+    model_config = ConfigDict(frozen=True)
+
+async def resolve_media_ids(media_ids: list[str], media_manager: MediaManager) -> List[str]:
+    result = []
+    for media_id in media_ids:
+        media = media_manager.get_media(media_id)
+        if media is not None:
+            base64_data = await media.get_base64()
+            result.append(base64_data)
+    return result
 
 def convert_llm_response(response_data: dict[str, dict]) -> list[LLMChatContentPartType]:
     # 在官方文档中无法得知tool_call时content是否为空，因此两个都记录下来
@@ -65,26 +80,7 @@ def resolve_tool_calls(response_data: dict[str, dict]) -> Optional[list[ToolCall
 
 def convert_tools_to_ollama_format(tools: list[Tool]) -> list[dict]:
     # 这里将其独立出来方便应对后续接口改动
-    return [{
-        "type": "function",
-        "function": {
-            "type": tool.type,
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": {
-                "type": tool.parameters.type,
-                "properties": tool.parameters.properties,
-                "required": tool.parameters.required
-            }
-        }
-    } for tool in tools]
-
-class OllamaConfig(BaseModel):
-    api_base: str = "http://localhost:11434"
-    model_config = ConfigDict(frozen=True)
-
-async def resolve_media_ids(media_ids: list[str], media_manager: MediaManager) -> list[str]:
-    return [await media_manager.get_media(media_id).get_base64() for media_id in media_ids]
+    return [tool.model_dump(exclude={"strict": True, "parameters": {"additionalProperties": True}}) for tool in tools]
 
 class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
     def __init__(self, config: OllamaConfig):
@@ -138,6 +134,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             print(f"API Response: {response.text}")
             raise e
         # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+
         return LLMChatResponse(
             model=req.model,
             message=Message(

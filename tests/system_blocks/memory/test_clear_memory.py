@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.im.message import IMMessage
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
@@ -12,7 +13,8 @@ from kirara_ai.workflow.implementations.blocks.memory.clear_memory import ClearM
 
 # 创建模拟的 MemoryManager 类
 class MockMemoryManager(MemoryManager):
-    def __init__(self):
+    def __init__(self, container: DependencyContainer):
+        super().__init__(container)
         self.config = MagicMock()
         self.config.default_scope = "member"
         self.memories = {}
@@ -46,8 +48,10 @@ async def test_clear_memory_async():
     chat_sender = ChatSender.from_c2c_chat(user_id="test_user", display_name="Test User")
     
     # 注册到容器
-    container.register(MemoryManager, MockMemoryManager())
-    container.register(ScopeRegistry, MockScopeRegistry())
+    container.register(DependencyContainer, container)
+    container.register(GlobalConfig, GlobalConfig())
+    container.register(MemoryManager, MockMemoryManager(container))
+    container.register(ScopeRegistry, MockScopeRegistry(container))
     container.register(ComposerRegistry, MagicMock(spec=ComposerRegistry))
     container.register(DecomposerRegistry, MagicMock(spec=DecomposerRegistry))
     

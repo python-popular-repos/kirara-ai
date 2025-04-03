@@ -50,7 +50,8 @@ class LLMChatRequest(BaseModel):
             tool_choice这个参数告诉llmMessage应该如何选择调用的工具。
             "
     """
-    messages: Optional[List[LLMChatMessage]] = None
+    
+    messages: List[LLMChatMessage] = []
     model: Optional[str] = None
     frequency_penalty: Optional[int] = None
     max_tokens: Optional[int] = None

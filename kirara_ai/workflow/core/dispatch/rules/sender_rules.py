@@ -11,9 +11,9 @@ from .base import DispatchRule, RuleConfig
 
 class ChatSenderMatchRuleConfig(RuleConfig):
     """聊天发送者规则配置"""
-    sender_id: str = Field(title="发送者ID", description="发送者ID")
+    sender_id: str = Field(title="发送者ID", description="发送者ID", default="")
     sender_group: str = Field(
-        title="发送者群号（可空）", description="发送者群号", default=""
+        title="发送者群号", description="发送者群号", default=""
     ) 
     
 class ChatSenderMatchRule(DispatchRule):
@@ -23,7 +23,7 @@ class ChatSenderMatchRule(DispatchRule):
 
     def __init__(
         self,
-        sender_id: str,
+        sender_id: Optional[str],
         sender_group: Optional[str],
         workflow_registry: WorkflowRegistry,
         workflow_id: str,
@@ -31,17 +31,21 @@ class ChatSenderMatchRule(DispatchRule):
         super().__init__(workflow_registry, workflow_id)
         self.sender_id = sender_id
         self.sender_group = sender_group
-
     def match(self, message: IMMessage) -> bool:
-        if self.sender_group:
-            match_group = message.sender.group_id == self.sender_group
-        else:
-            match_group = True
-        return match_group and message.sender.user_id == self.sender_id
+        # 如果设置了群组ID，则必须匹配
+        if self.sender_group and message.sender.group_id != self.sender_group:
+            return False
+        
+        # 如果设置了发送者ID，则必须匹配
+        if self.sender_id and message.sender.user_id != self.sender_id:
+            return False
+        
+        # 如果没有设置任何条件或所有条件都匹配，则返回True
+        return True
 
     def get_config(self) -> ChatSenderMatchRuleConfig:
         return ChatSenderMatchRuleConfig(
-            sender_id=self.sender_id, sender_group=self.sender_group
+            sender_id=self.sender_id or "", sender_group=self.sender_group or ""
         )
 
     @classmethod
@@ -60,7 +64,7 @@ class ChatSenderMismatchRule(DispatchRule):
 
     def __init__(
         self,
-        sender_id: str,
+        sender_id: Optional[str],
         sender_group: Optional[str],
         workflow_registry: WorkflowRegistry,
         workflow_id: str,
@@ -70,15 +74,20 @@ class ChatSenderMismatchRule(DispatchRule):
         self.sender_group = sender_group
 
     def match(self, message: IMMessage) -> bool:
-        if self.sender_group:
-            match_group = message.sender.group_id != self.sender_group
-        else:
-            match_group = True
-        return match_group and message.sender.user_id != self.sender_id
+        # 如果设置了群组ID，则必须不匹配
+        if self.sender_group and message.sender.group_id == self.sender_group:
+            return False
+        
+        # 如果设置了发送者ID，则必须不匹配
+        if self.sender_id and message.sender.user_id == self.sender_id:
+            return False
+        
+        # 如果没有设置任何条件或所有条件都不匹配，则返回True
+        return True
 
     def get_config(self) -> ChatSenderMatchRuleConfig:
         return ChatSenderMatchRuleConfig(
-            sender_id=self.sender_id, sender_group=self.sender_group
+            sender_id=self.sender_id or "", sender_group=self.sender_group or ""
         )
 
     @classmethod
@@ -108,7 +117,7 @@ class ChatTypeMatchRule(DispatchRule):
         return message.sender.chat_type == self.chat_type
 
     def get_config(self) -> ChatTypeMatchRuleConfig:
-        return ChatTypeMatchRuleConfig(chat_type=self.chat_type)
+        return ChatTypeMatchRuleConfig(chat_type=self.chat_type.to_str()) # type: ignore
 
     @classmethod
     def from_config(cls, config: ChatTypeMatchRuleConfig, workflow_registry: WorkflowRegistry, workflow_id: str) -> "ChatTypeMatchRule":

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import List, Optional, Union
 
 from kirara_ai.im.message import IMMessage
 from kirara_ai.im.sender import ChatSender
@@ -19,7 +19,7 @@ class MemoryComposer(ABC):
 
     @abstractmethod
     def compose(
-        self, sender: ChatSender, message: List[ComposableMessageType]
+        self, sender: Optional[ChatSender], message: List[ComposableMessageType]
     ) -> MemoryEntry:
         """将消息转换为记忆条目"""
 
