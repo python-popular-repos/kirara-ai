@@ -197,6 +197,7 @@ class ExampleFunction(Block, ABC):
         # 然后将所有函数调用结果按照LLMChaMessage(role="tool", content=[LLMToolResultContent])，整合为另外一个LLMChatMessage，拼接到上次构建的LLMChatRequest中。
         "request_body": Output("tool_result", "工具回应", LLMChatRequest, "请将全部上下文信息整合为LLMChatRequest")
     }
+    container: DependencyContainer
 
     @abstractmethod
     def __init__(self):
@@ -215,13 +216,13 @@ class FunctionCalling(Block):
     """
     name = "function_calling"
     inputs = {
-        "request_body": Input("request_body", "llm 函数调用请求体", LLMChatRequest, "传递一个规范的函数调用请求体", True),
+        "request_body": Input("request_body", "llm 函数调用请求体", LLMChatRequest, "传递一个规范的函数调用请求体"),
     }
     outputs = {
         "resp": Output("resp", "llm 回应", LLMChatResponse, "返回的response, llm认为无需调用tool或者根据tool结果返回"),
         "tool_call": Output("call_tools", "llm 回应", LLMChatResponse, "返回的response带有tool_calls字段，你需要根据此字段进行下一个动作")
     }
-    container = DependencyContainer
+    container: DependencyContainer
     
     def __init__(self, model_name: Annotated[
             str, 
@@ -234,6 +235,8 @@ class FunctionCalling(Block):
     def execute(self, request_body: LLMChatRequest) -> Dict[str, Any]:
         if not self.model_name:
             raise ValueError("need a model name which support function calling")
+        else:
+            self.logger.info(f"Using  model: {self.model_name} to execute function calling")
         llm = self.container.resolve(LLMManager).get_llm(self.model_name)
         if not llm:
             raise ValueError(f"LLM {self.model_name} not found, please check the model name")
@@ -241,6 +244,8 @@ class FunctionCalling(Block):
         request_body.model = self.model_name
         response: LLMChatResponse = llm.chat(request_body)
         if not response.message.tool_calls:
+            self.logger.debug("No tool calls found, return response directly")
             return {"resp": response}
         else:
+            self.logger.debug("Tool calls found, return response with tool calls")
             return {"tool_call": response}

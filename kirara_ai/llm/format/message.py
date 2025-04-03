@@ -54,9 +54,9 @@ class LLMChatMessage(BaseModel):
         # 用于检查 content 字段的类型是否符合 role 要求
         match self.role:
             case "user" | "assistant" | "system":
-                if not isinstance(list[LLMChatContentPartType], self.content):
+                if not all(isinstance(element, LLMChatContentPartType) for element in self.content):
                     raise ValueError(f"content must be a list of LLMChatContentPartType, when role is {self.role}")
             case "tool":
-                if not isinstance(list[LLMToolResultContent], self.content):
+                if not all(isinstance(element, LLMToolResultContent) for element in self.content):
                     raise ValueError("content must be a list of LLMToolResultContent, when role is 'tool'")
         return self
