@@ -281,7 +281,7 @@ async def perform_update():
             webui_url = data["webui_download_url"]
             webui_file, webui_hash = await download_file(webui_url, temp_dir)
             # 解压并安装前端
-            static_dir = current_app.static_folder
+            static_dir = current_app.static_folder or "web"
             with tarfile.open(webui_file, "r:gz") as tar:
                 # 解压 package/dist 里的所有文件到 web 目录
                 for member in tar.getmembers():

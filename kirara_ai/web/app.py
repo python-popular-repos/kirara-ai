@@ -15,7 +15,7 @@ from kirara_ai.config.global_config import GlobalConfig
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import HypercornLoggerWrapper, get_logger
 from kirara_ai.web.auth.services import AuthService, FileBasedAuthService
-from kirara_ai.web.utils import create_no_cache_response
+from kirara_ai.web.utils import create_no_cache_response, install_webui
 
 from .api.block import block_bp
 from .api.dispatch import dispatch_bp
@@ -267,8 +267,8 @@ class WebServer:
 
     async def start(self):
         """启动Web服务器"""
+
         # 确定最终使用的host和port
-        
         if self.container.has("cli_args"):
             cli_args = self.container.resolve("cli_args")
             self.listen_host = cli_args.host
@@ -285,9 +285,12 @@ class WebServer:
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
-        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait))
+        self.server_task = asyncio.create_task(serve(self.app, self.hypercorn_config, shutdown_trigger=self.shutdown_event.wait)) # type: ignore
         logger.info(f"监听地址：http://{self.listen_host}:{self.listen_port}/")
-
+                
+        # 检查WebUI是否存在，如果不存在则尝试自动安装
+        self._check_and_install_webui()
+        
     async def stop(self):
         """停止Web服务器"""
         self.shutdown_event.set()
@@ -309,3 +312,26 @@ class WebServer:
             return
 
         custom_static_assets[url_path] = local_path
+
+    def _check_and_install_webui(self):
+        """检查WebUI是否存在，如果不存在则尝试自动安装"""
+        index_path = Path(STATIC_FOLDER) / "index.html"
+        if not index_path.exists():
+            logger.info("检测到WebUI不存在，将在服务器启动后自动安装...")
+            # 创建异步任务，但不等待完成
+            self._webui_install_task = asyncio.create_task(self._install_webui())
+        
+    async def _install_webui(self):
+        """安装WebUI的异步任务"""
+        try:
+            logger.info("开始自动安装WebUI...")
+            success, message = await install_webui(Path(STATIC_FOLDER))
+            
+            if success:
+                logger.info(message)
+                logger.info(f"WebUI已安装到 {STATIC_FOLDER}，请刷新浏览器")
+            else:
+                logger.error(message)
+                logger.error("WebUI自动安装失败，请手动下载并安装")
+        except Exception as e:
+            logger.error(f"WebUI安装过程出错: {e}")
