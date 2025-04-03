@@ -271,8 +271,8 @@ class WebServer:
         # 确定最终使用的host和port
         if self.container.has("cli_args"):
             cli_args = self.container.resolve("cli_args")
-            self.listen_host = cli_args.host
-            self.listen_port = cli_args.port
+            self.listen_host = cli_args.host or self.config.web.host
+            self.listen_port = cli_args.port or self.config.web.port
         else:
             self.listen_host = self.config.web.host
             self.listen_port = self.config.web.port
