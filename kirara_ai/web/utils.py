@@ -1,19 +1,22 @@
 from pathlib import Path
 
-from fastapi import Request
-from fastapi.responses import FileResponse
+from fastapi import HTTPException, Request
+from fastapi.responses import FileResponse, Response
 
 
-async def create_no_cache_response(file_path: Path, request: Request) -> FileResponse:
-    """创建禁止缓存的文件响应
-    
-    每次请求都会返回最新的文件内容，不使用浏览器缓存
-    """
+async def create_no_cache_response(file_path: Path, request: Request) -> Response:
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    stat = file_path.stat()
+    mtime = stat.st_mtime_ns
+    size = stat.st_size
+    etag = f"{mtime}-{size}"
+
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match == etag:
+        return Response(status_code=304)
+
     response = FileResponse(file_path)
-    
-    # 添加禁止缓存的头信息
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "no-cache"
     return response 

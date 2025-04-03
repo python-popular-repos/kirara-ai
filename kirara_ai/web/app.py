@@ -134,6 +134,8 @@ def create_app(container: DependencyContainer) -> FastAPI:
         file_path = Path(custom_static_assets[path])
         try:
             return await create_no_cache_response(file_path, request)
+        except HTTPException as e:
+            raise e
         except Exception as e:
             logger.error(f"处理自定义静态资源时出错: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
@@ -146,6 +148,8 @@ def create_app(container: DependencyContainer) -> FastAPI:
                 return HTMLResponse(content=ERROR_MESSAGE.replace("TARGET_DIR", STATIC_FOLDER))
 
             return await create_no_cache_response(index_path, request)
+        except HTTPException as e:
+            raise e
         except Exception as e:
             logger.error(f"Error serving index: {e}")
             return HTMLResponse(content=ERROR_MESSAGE.replace("TARGET_DIR", STATIC_FOLDER))
@@ -178,6 +182,8 @@ def create_app(container: DependencyContainer) -> FastAPI:
         if file_path.is_file():
             try:
                 return await create_no_cache_response(file_path, request)
+            except HTTPException as e:
+                raise e
             except Exception as e:
                 logger.error(f"处理静态文件时出错: {e}")
                 return FileResponse(file_path)  # 退回到普通文件响应
@@ -187,6 +193,8 @@ def create_app(container: DependencyContainer) -> FastAPI:
         if fallback_path.is_file():
             try:
                 return await create_no_cache_response(fallback_path, request)
+            except HTTPException as e:
+                raise e
             except Exception as e:
                 logger.error(f"处理index.html时出错: {e}")
                 return FileResponse(fallback_path)  # 退回到普通文件响应
