@@ -244,7 +244,7 @@ def run_application(container: DependencyContainer):
     try:
         logger.success("Kirara AI 启动完毕，等待消息中...")
         logger.success(
-            f"WebUI 管理平台本地访问地址：http://127.0.0.1:{web_server.config.web.port}/"
+            f"WebUI 管理平台本地访问地址：http://127.0.0.1:{web_server.listen_port}/"
         )
         logger.success("Application started. Waiting for events...")
         loop.create_task(check_update())
