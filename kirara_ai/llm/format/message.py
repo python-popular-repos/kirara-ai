@@ -38,7 +38,7 @@ class LLMToolResultContent(BaseModel):
     # 各家工具要求返回的content格式不同. 等待后续规范化。
     content: Any
 
-LLMChatContentPartType = Union[LLMChatTextContent, LLMChatImageContent, LLMToolCallContent]
+LLMChatContentPartType = Union[LLMChatTextContent, LLMChatImageContent, LLMToolCallContent, LLMToolResultContent]
 RoleTypes = Literal["user", "assistant", "system", "tool"]
 
 class LLMChatMessage(BaseModel):
@@ -54,7 +54,7 @@ class LLMChatMessage(BaseModel):
         # 用于检查 content 字段的类型是否符合 role 要求
         match self.role:
             case "user" | "assistant" | "system":
-                if not all(isinstance(element, LLMChatContentPartType) for element in self.content):
+                if not all(any(isinstance(element, content_type) for content_type in [LLMChatTextContent, LLMChatImageContent]) for element in self.content):
                     raise ValueError(f"content must be a list of LLMChatContentPartType, when role is {self.role}")
             case "tool":
                 if not all(isinstance(element, LLMToolResultContent) for element in self.content):

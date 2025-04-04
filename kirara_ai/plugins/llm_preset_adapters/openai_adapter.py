@@ -3,9 +3,8 @@ from typing import List
 
 import aiohttp
 import requests
-import json
 from pydantic import  ConfigDict
-from typing import cast, Union, Optional
+from typing import cast, Optional
 
 from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
@@ -53,7 +52,7 @@ def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], m
     # 扁平化结果, 展开所有列表
     return [item for sublist in results for item in sublist]
 
-def resolve_tool_calls_from_response(tool_calls: Optional[list[dict[str, Union[str, dict[str, str]]]]]):
+def resolve_tool_calls_from_response(tool_calls: Optional[list[dict]]):
     if tool_calls is None:
         return None
     else:
@@ -62,8 +61,8 @@ def resolve_tool_calls_from_response(tool_calls: Optional[list[dict[str, Union[s
             type=call["type"],
             function=Function(
                 name=call["function"]["name"],
-                # openai api 的 arguments 值是一个长得像dict的字符串
-                arguments= json.loads(call["function"]["arguments"]) if call["function"].get("arguments", None) else None
+                # openai api 的 arguments 值是一个长得像dict的字符串, 交给 pydantic 验证器转换
+                arguments=call["function"].get("arguments", None)
             )
         ) for call in tool_calls]
 

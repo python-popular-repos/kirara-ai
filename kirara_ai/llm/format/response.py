@@ -1,6 +1,6 @@
-from typing import List, Optional, Literal
-
-from pydantic import BaseModel
+from typing import List, Optional, Literal, Union
+import json
+from pydantic import BaseModel, field_validator
 
 from kirara_ai.llm.format.message import LLMChatMessage
 
@@ -12,6 +12,13 @@ class Function(BaseModel):
     # 这个字段类似于 python 的关键子参数，你可以直接使用`**arguments`
     arguments: Optional[dict] = None
 
+    @classmethod
+    @field_validator("arguments", mode="before")
+    def convert_arguments(cls, v: Optional[Union[str, dict]]) -> Optional[dict]:
+        if isinstance(v, str):
+            return json.loads(v)
+        else:
+            return v
 
 class ToolCall(BaseModel):
     id: Optional[str] = None
