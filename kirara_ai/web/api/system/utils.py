@@ -116,6 +116,6 @@ def get_memory_usage() -> dict:
 def get_cpu_usage() -> float:
     """获取CPU使用率"""
     try:
-        return psutil.Process().cpu_percent()
+        return psutil.cpu_percent()
     except:
         return 0.0

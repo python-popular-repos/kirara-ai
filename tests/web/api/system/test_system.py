@@ -76,9 +76,21 @@ class TestSystemStatus:
         )
         mock_process.memory_percent.return_value = 2.5
         mock_process.cpu_percent.return_value = 1.2
+        
+        # Mock psutil.virtual_memory
+        mock_virtual_memory = MagicMock()
+        mock_virtual_memory.total = 1024 * 1024 * 8192  # 8GB
+        mock_virtual_memory.available = 1024 * 1024 * 4096  # 4GB
+        mock_virtual_memory.used = 1024 * 1024 * 4096  # 4GB
 
         with patch(
             "kirara_ai.web.api.system.routes.psutil.Process", return_value=mock_process
+        ), patch(
+            "kirara_ai.web.api.system.utils.psutil.Process", return_value=mock_process
+        ), patch(
+            "kirara_ai.web.api.system.utils.psutil.virtual_memory", return_value=mock_virtual_memory
+        ), patch(
+            "kirara_ai.web.api.system.utils.psutil.cpu_percent", return_value=1.2
         ):
             response = test_client.get(
                 "/backend-api/api/system/status", headers=auth_headers
@@ -101,9 +113,10 @@ class TestSystemStatus:
             # 验证资源使用情况
             assert "memory_usage" in status
             assert "cpu_usage" in status
-            assert status["memory_usage"]["rss"] == 100  # 100MB
-            assert status["memory_usage"]["vms"] == 500  # 500MB
             assert status["memory_usage"]["percent"] == 2.5
+            assert status["memory_usage"]["total"] == 8192  # 8GB
+            assert status["memory_usage"]["free"] == 4096  # 4GB
+            assert status["memory_usage"]["used"] == 4096  # 4GB
             assert status["cpu_usage"] == 1.2
 
     @pytest.mark.asyncio
