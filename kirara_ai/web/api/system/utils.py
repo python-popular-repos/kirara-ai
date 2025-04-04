@@ -84,7 +84,6 @@ async def download_file(url: str, temp_dir: str) -> tuple[str, str]:
 def get_cpu_info() -> str:
     """获取CPU信息，使用lru_cache进行缓存"""
     try:
-        print('sys.platform', sys.platform)
         if sys.platform == 'win32':
             # Windows 系统下获取 CPU 信息
             result = subprocess.run(['wmic', 'cpu', 'get', 'name'], capture_output=True, text=True)

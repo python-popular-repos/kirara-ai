@@ -4,7 +4,8 @@ from typing import List, Optional, Union
 
 from kirara_ai.im.message import IMMessage, MediaMessage, TextMessage
 from kirara_ai.im.sender import ChatSender
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, RoleType
+from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
+                                          LLMChatTextContent, RoleType)
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.memory.entry import MemoryEntry
@@ -125,7 +126,7 @@ class MultiElementDecomposer(MemoryDecomposer):
         return decomposed_messages
 
     def create_llm_chat_message(self, content: str, role: RoleType, sender: ChatSender) -> Union[LLMChatMessage, None]:
-        message_content: List[Union[LLMChatTextContent, LLMChatImageContent]] = []
+        message_content: List[LLMChatContentPartType] = []
 
         # 使用正则表达式提取 <media_msg> 标签
         media_msg_pattern = re.compile(r'<media_msg id=(.*?) desc="(.*?)" />')

@@ -9,7 +9,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 from telegramify_markdown import markdownify
 
 from kirara_ai.im.adapter import BotProfileAdapter, EditStateAdapter, IMAdapter, UserProfileAdapter
-from kirara_ai.im.message import ImageMessage, IMMessage, MentionElement, MessageElement, TextMessage, VoiceMessage
+from kirara_ai.im.message import (FileElement, ImageMessage, IMMessage, MentionElement, MessageElement, TextMessage,
+                                  VideoMessage, VoiceMessage)
 from kirara_ai.im.profile import UserProfile
 from kirara_ai.im.sender import ChatSender, ChatType
 from kirara_ai.logger import get_logger
@@ -148,7 +149,7 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
         if raw_message.message.voice:
             voice_file = await raw_message.message.voice.get_file()
             data = await voice_file.download_as_bytearray()
-            voice_element = VoiceMessage(data=data)
+            voice_element = VoiceMessage(data=bytes(data))
             message_elements.append(voice_element)
 
         # 处理图片消息
@@ -157,8 +158,20 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
             photo = raw_message.message.photo[-1]
             photo_file = await photo.get_file()
             data = await photo_file.download_as_bytearray()
-            photo_element = ImageMessage(data=data)
+            photo_element = ImageMessage(data=bytes(data))
             message_elements.append(photo_element)
+            
+        if raw_message.message.video:
+            video_file = await raw_message.message.video.get_file()
+            data = await video_file.download_as_bytearray()
+            video_element = VideoMessage(data=bytes(data))
+            message_elements.append(video_element)
+            
+        if raw_message.message.document:
+            document_file = await raw_message.message.document.get_file()
+            data = await document_file.download_as_bytearray()
+            document_element = FileElement(data=bytes(data))
+            message_elements.append(document_element)
 
         # 创建 Message 对象
         message = IMMessage(

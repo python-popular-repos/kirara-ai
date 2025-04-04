@@ -1,16 +1,16 @@
 import asyncio
-from typing import List
+from typing import Optional, cast
 
 import aiohttp
 import requests
-from pydantic import  ConfigDict
-from typing import cast, Optional
+from pydantic import ConfigDict
 
 from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMChatContentPartType, LLMToolCallContent, LLMToolResultContent
+from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
+                                          LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
 from kirara_ai.llm.format.request import LLMChatRequest
-from kirara_ai.llm.format.response import LLMChatResponse, Message, ToolCall, Usage, Function
+from kirara_ai.llm.format.response import Function, LLMChatResponse, Message, ToolCall, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -126,14 +126,15 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         message: dict = first_choice.get("message", {})
         
         # 检测tool_calls字段是否存在和是否不为None. tool_call时content字段无有效信息，暂不记录
+        content: list[LLMChatContentPartType] = []
         if tool_calls := message.get("tool_calls", None):
-            content: list[LLMChatContentPartType] = [LLMToolCallContent(
+            content = [LLMToolCallContent(
                 id=call["id"],
                 name=call["function"]["name"],
                 parameters=call["function"].get("parameters", None)
             ) for call in tool_calls]
         else:
-            content: list[LLMChatContentPartType] = [LLMChatTextContent(text=message.get("content", ""))]
+            content = [LLMChatTextContent(text=message.get("content", ""))]
 
         usage_data = response_data.get("usage", {})
         

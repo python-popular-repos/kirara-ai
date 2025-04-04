@@ -1,6 +1,8 @@
-from typing import Literal, Optional, Union, Any, Self
 import json
-from pydantic import BaseModel, model_validator, field_validator
+from typing import Any, Literal, Optional, Union
+
+from pydantic import BaseModel, field_validator, model_validator
+from typing_extensions import Self
 
 RoleType = Literal["system", "user", "assistant"]
 

@@ -84,8 +84,6 @@ class TestSystemStatus:
         mock_virtual_memory.used = 1024 * 1024 * 4096  # 4GB
 
         with patch(
-            "kirara_ai.web.api.system.routes.psutil.Process", return_value=mock_process
-        ), patch(
             "kirara_ai.web.api.system.utils.psutil.Process", return_value=mock_process
         ), patch(
             "kirara_ai.web.api.system.utils.psutil.virtual_memory", return_value=mock_virtual_memory
