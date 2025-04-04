@@ -23,7 +23,14 @@ def main():
     finally:
         if get_and_reset_restart_flag():
             # 重新启动程序
-            process = subprocess.Popen([sys.executable, "-m", "kirara_ai", *args.args], env=os.environ, cwd=os.getcwd())
+            # 构建命令行参数，透传所有原始参数
+            cmd = [sys.executable, "-m", "kirara_ai"]
+            # 从解析后的参数对象中获取参数
+            if args.host:
+                cmd.extend(["-H", args.host])
+            if args.port:
+                cmd.extend(["-p", str(args.port)])
+            process = subprocess.Popen(cmd, env=os.environ, cwd=os.getcwd())
             process.wait()
 
 if __name__ == "__main__":

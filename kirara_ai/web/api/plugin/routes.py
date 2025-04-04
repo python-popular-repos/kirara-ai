@@ -154,6 +154,9 @@ async def install_plugin():
         if plugin_info.package_name not in config.plugins.enable:
             config.plugins.enable.append(plugin_info.package_name)
             ConfigLoader.save_config_with_backup(CONFIG_FILE, config)
+            
+        # 加载插件
+        loader.load_plugin(plugin_info.name)
 
         return PluginResponse(plugin=plugin_info).model_dump()
     except Exception as e:
@@ -270,10 +273,11 @@ async def update_plugin(plugin_name: str):
     # 内部插件不支持更新
     if plugin_info.is_internal:
         return jsonify({"error": "Cannot update internal plugin"}), 400
-
+    
+    new_package_name = request.args.get("package_name", None)
     try:
         # 执行更新
-        updated_info = await loader.update_plugin(plugin_name)
+        updated_info = await loader.update_plugin(plugin_name, new_package_name)
         if not updated_info:
             return jsonify({"error": "Failed to update plugin"}), 500
 
