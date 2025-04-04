@@ -14,6 +14,11 @@ class SystemStatus(BaseModel):
     workflow_count: int
     memory_usage: Dict[str, float]
     cpu_usage: float
+    cpu_info: str
+    python_version: str
+    platform: str
+    has_proxy: bool
+
 
 
 class SystemStatusResponse(BaseModel):

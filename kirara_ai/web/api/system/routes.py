@@ -8,7 +8,6 @@ import tarfile
 import tempfile
 import time
 
-import psutil
 from packaging import version
 from quart import Blueprint, current_app, g, request, websocket
 
@@ -19,8 +18,8 @@ from kirara_ai.internal import set_restart_flag, shutdown_event
 from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.logger import WebSocketLogHandler, get_logger
 from kirara_ai.plugin_manager.plugin_loader import PluginLoader
-from kirara_ai.web.api.system.utils import (download_file, get_installed_version, get_latest_npm_version,
-                                            get_latest_pypi_version)
+from kirara_ai.web.api.system.utils import (download_file, get_cpu_info, get_cpu_usage, get_installed_version,
+                                            get_latest_npm_version, get_latest_pypi_version, get_memory_usage)
 from kirara_ai.web.auth.services import AuthService
 from kirara_ai.workflow.core.workflow import WorkflowRegistry
 
@@ -213,13 +212,21 @@ async def get_system_status():
     workflow_count = len(workflow_registry._workflows)
 
     # 获取系统资源使用情况
-    process = psutil.Process()
-    memory_usage = {
-        "rss": process.memory_info().rss / 1024 / 1024,  # MB
-        "vms": process.memory_info().vms / 1024 / 1024,  # MB
-        "percent": process.memory_percent(),
-    }
-    cpu_usage = process.cpu_percent()
+    memory_usage = get_memory_usage()
+    cpu_usage = get_cpu_usage()
+    
+    # 检测代理服务
+    has_proxy = bool(os.environ.get('HTTP_PROXY') or os.environ.get('HTTPS_PROXY') or 
+                    os.environ.get('http_proxy') or os.environ.get('https_proxy'))
+
+    # 获取CPU信息
+    cpu_info = get_cpu_info()
+
+    # 获取Python版本
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+    # 获取平台信息
+    platform_info = f"{sys.platform}"
 
     status = SystemStatus(
         uptime=uptime,
@@ -230,6 +237,10 @@ async def get_system_status():
         memory_usage=memory_usage,
         cpu_usage=cpu_usage,
         version=get_installed_version(),
+        platform=platform_info,
+        cpu_info=cpu_info,
+        python_version=python_version,
+        has_proxy=has_proxy,
     )
 
     return SystemStatusResponse(status=status).model_dump()
