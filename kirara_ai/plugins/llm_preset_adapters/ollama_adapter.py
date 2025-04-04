@@ -31,11 +31,10 @@ async def resolve_media_ids(media_ids: list[str], media_manager: MediaManager) -
 
 def convert_llm_response(response_data: dict[str, dict]) -> list[LLMChatContentPartType]:
     # 在官方文档中无法得知tool_call时content是否为空，因此两个都记录下来
-    content = [LLMChatTextContent(text=response_data["message"].get("content", ""))]
+    content: list[LLMChatContentPartType] = [LLMChatTextContent(text=response_data["message"].get("content", ""))]
     calls = []
     if response_data["message"].get("tool_calls", None):
         for tool_call in response_data["message"]["tool_calls"]:
-            tool_call: dict[str, dict] # 类型标注，运行时将被忽略
             calls.append(
                 LLMToolCallContent(
                     name=tool_call["function"]["name"],
@@ -47,7 +46,7 @@ def convert_llm_response(response_data: dict[str, dict]) -> list[LLMChatContentP
 
 def convert_non_tool_message(msg: LLMChatMessage, media_manager: MediaManager, loop: asyncio.AbstractEventLoop):
     text_content = ""
-    images = []
+    images: list[str] = []
     for part in msg.content:
         if isinstance(part, LLMChatTextContent):
             text_content += part.text
@@ -66,7 +65,6 @@ def resolve_tool_calls(response_data: dict[str, dict]) -> Optional[list[ToolCall
     if tool_calls := response_data["message"].get("tool_calls", None):
         calls: list[ToolCall] = []
         for call in tool_calls:
-            call: dict[str, dict] # 类型标注，运行时将被忽略
             calls.append(ToolCall(
                 model = "ollama",
                 function = Function(

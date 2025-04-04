@@ -41,7 +41,7 @@ def get_llm_tool_calls() -> list[ToolCall]:
             model = "openai",
             function = Function(
                 name="get_weather",
-                parameters={"location": "San Francisco, CA"}
+                arguments={"location": "San Francisco, CA"}
             )
         )
     ]

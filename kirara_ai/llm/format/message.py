@@ -1,6 +1,6 @@
 from typing import Literal, Optional, Union, Any, Self
-
-from pydantic import BaseModel, model_validator
+import json
+from pydantic import BaseModel, model_validator, field_validator
 
 RoleType = Literal["system", "user", "assistant"]
 
@@ -23,7 +23,14 @@ class LLMToolCallContent(BaseModel):
     id: Optional[str] = None
     name: str
     # tool可能没有参数。
-    parameters: Optional[dict | str] = None
+    parameters: Optional[dict] = None
+
+    @classmethod
+    @field_validator("parameters", mode="before")
+    def convert_parameters_to_dict(cls, v: Optional[Union[str, dict]]) -> Optional[dict]:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 class LLMToolResultContent(BaseModel):
     """
@@ -45,7 +52,7 @@ class LLMChatMessage(BaseModel):
     """
     当 role 为 "tool" 时，content 内部只能为 list[LLMToolResultContent]
     """
-    content: LLMChatContentPartType
+    content: list[LLMChatContentPartType]
     role: RoleTypes
 
     @model_validator(mode="after")
