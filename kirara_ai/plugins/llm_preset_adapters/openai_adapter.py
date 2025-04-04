@@ -127,13 +127,13 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         
         # 检测tool_calls字段是否存在和是否不为None. tool_call时content字段无有效信息，暂不记录
         if tool_calls := message.get("tool_calls", None):
-            content = [LLMToolCallContent(
+            content: list[LLMChatContentPartType] = [LLMToolCallContent(
                 id=call["id"],
                 name=call["function"]["name"],
                 parameters=call["function"].get("parameters", None)
             ) for call in tool_calls]
         else:
-            content = [LLMChatTextContent(text=message.get("content", ""))]
+            content: list[LLMChatContentPartType] = [LLMChatTextContent(text=message.get("content", ""))]
 
         usage_data = response_data.get("usage", {})
         

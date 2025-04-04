@@ -1,4 +1,4 @@
-from typing import Literal, List, Optional, Union, Any, Self
+from typing import Literal, Optional, Union, Any, Self
 
 from pydantic import BaseModel, model_validator
 
@@ -45,7 +45,7 @@ class LLMChatMessage(BaseModel):
     """
     当 role 为 "tool" 时，content 内部只能为 list[LLMToolResultContent]
     """
-    content: Union[List[LLMChatContentPartType], List[LLMToolResultContent]]
+    content: LLMChatContentPartType
     role: RoleTypes
 
     @model_validator(mode="after")
