@@ -120,7 +120,9 @@ async def create_workflow(group_id: str, workflow_id: str):
                 builder.chain(block_class, name=block_def.name, **block_def.config)
 
             builder.update_position(block_def.name, block_def.position)
-
+        
+        # 不要用自动连线，用我们的
+        builder.wire_specs = []
         # 添加连接
         for wire in workflow_def.wires:
             builder.force_connect(
@@ -175,6 +177,9 @@ async def update_workflow(group_id: str, workflow_id: str):
                 builder.chain(block_class, name=block_def.name, **block_def.config)
 
             builder.update_position(block_def.name, block_def.position)
+        
+        # 不要用自动连线，用我们的
+        builder.wire_specs = []
 
         # 添加连接
         for wire in workflow_def.wires:

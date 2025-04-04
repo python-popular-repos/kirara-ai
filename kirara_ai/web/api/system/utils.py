@@ -1,7 +1,11 @@
 import hashlib
 import os
+import subprocess
+import sys
+from functools import lru_cache
 
 import aiohttp
+import psutil
 
 
 def get_installed_version() -> str:
@@ -75,3 +79,43 @@ async def download_file(url: str, temp_dir: str) -> tuple[str, str]:
     except Exception as e:
         print(f"下载失败: {e}")
         return "", ""
+
+@lru_cache(maxsize=1)
+def get_cpu_info() -> str:
+    """获取CPU信息，使用lru_cache进行缓存"""
+    try:
+        print('sys.platform', sys.platform)
+        if sys.platform == 'win32':
+            # Windows 系统下获取 CPU 信息
+            result = subprocess.run(['wmic', 'cpu', 'get', 'name'], capture_output=True, text=True)
+            if result.returncode == 0:
+                cpu_info = result.stdout.strip().removeprefix('Name').strip()
+        else:
+            # Linux 系统下获取 CPU 信息
+            with open('/proc/cpuinfo', 'r') as f:
+                for line in f:
+                    if line.startswith('model name'):
+                        cpu_info = line.split(':')[1].strip()
+                        break
+        
+        return cpu_info if cpu_info else "Unknown"
+    except:
+        return "Unknown"
+
+def get_memory_usage() -> dict:
+    """获取内存使用情况"""
+    process = psutil.Process()
+    system_memory = psutil.virtual_memory()
+    return {
+        "percent": process.memory_percent(),
+        "total": system_memory.total / 1024 / 1024,  # MB
+        "free": system_memory.available / 1024 / 1024,  # MB
+        "used": system_memory.used / 1024 / 1024,  # MB
+    }
+
+def get_cpu_usage() -> float:
+    """获取CPU使用率"""
+    try:
+        return psutil.Process().cpu_percent()
+    except:
+        return 0.0
