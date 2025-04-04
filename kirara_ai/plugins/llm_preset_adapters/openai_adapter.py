@@ -3,9 +3,8 @@ from typing import Optional, cast
 
 import aiohttp
 import requests
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
                                           LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
@@ -66,7 +65,7 @@ def resolve_tool_calls_from_response(tool_calls: Optional[list[dict]]):
             )
         ) for call in tool_calls]
 
-class OpenAIConfig(LLMBackendConfig):
+class OpenAIConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
     model_config = ConfigDict(frozen=True)
@@ -102,7 +101,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             "top_p": req.top_p,
             # tool pydantic 模型按照 openai api 格式进行的建立。所以这里直接dump
             "tools": [tool.model_dump() for tool in req.tools] if req.tools else None,
-            "tool_choice": "auto",
+            "tool_choice": "auto" if req.tools else None,
             "logprobs": req.logprobs,
             "top_logprobs": req.top_logprobs,
         }

@@ -152,7 +152,6 @@ class LLMTracer(TracerBase[LLMRequestTrace]):
             backend_name = trace_data.get('backend_name', "unknown")
             start_time = trace_data.get('start_time', 0)
 
-            self.logger.debug(f"LLM request failed: {trace_id}")
             event = LLMRequestFailEvent(
                 trace_id=trace_id,
                 model_id=model_id,

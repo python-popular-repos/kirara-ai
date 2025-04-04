@@ -1,23 +1,22 @@
 import asyncio
 import base64
-from typing import List
+from typing import List, Optional
 
 import aiohttp
 import requests
-from pydantic import  ConfigDict
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
 
-from kirara_ai.config.global_config import LLMBackendConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
-from kirara_ai.llm.format.message import LLMChatImageContent, LLMChatMessage, LLMChatTextContent, LLMChatContentPartType, LLMToolResultContent, LLMToolCallContent
+from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
+                                          LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
-from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage, ToolCall, Function
+from kirara_ai.llm.format.response import Function, LLMChatResponse, Message, ToolCall, Usage
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing.decorator import trace_llm_chat
 
 
-class ClaudeConfig(LLMBackendConfig):
+class ClaudeConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.anthropic.com/v1"
     model_config = ConfigDict(frozen=True)
