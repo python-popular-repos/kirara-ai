@@ -269,10 +269,8 @@ class WorkflowBuilder:
 
         # 查找匹配的端口
         matches = self._find_matching_ports(source_node, target_node, available_inputs)
-        print('matches', matches)
         # 存储匹配的连接
         for source_output, target_input in matches:
-            print(f'{source_name}.{source_output} -> {target_name}.{target_input}')
             self.wire_specs.append((source_name, source_output, target_name, target_input))
 
     def _create_node(self, spec: BlockSpec, is_parallel: bool = False) -> Node:
@@ -546,7 +544,6 @@ class WorkflowBuilder:
                         )
             if connected_to:
                 block_data["connected_to"] = connected_to
-            print('block_data', block_data)
             return block_data
 
         # 序列化所有节点

@@ -179,7 +179,6 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
             message_elements=message_elements,
             raw_message=raw_message_dict,
         )
-        print(message)
         return message
 
     async def send_message(self, message: IMMessage, recipient: ChatSender):

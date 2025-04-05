@@ -144,8 +144,7 @@ class VolcengineAdapter(OpenAIAdapter):
                     if "TotalCount" in response_data and "PageSize" in response_data:
                         total_count = response_data["TotalCount"]
                         total_pages = (total_count + page_size - 1) // page_size
-                    # 提取模型信息，使用更简洁的链式判断
-                    print(response_data)
+
                     for model in response_data["Items"]:
                         foundation_model = model.get("FoundationModelTag", {})
                         if ("LLM" in foundation_model.get("Domains", []) and

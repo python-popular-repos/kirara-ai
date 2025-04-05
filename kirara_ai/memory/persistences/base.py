@@ -39,7 +39,7 @@ class AsyncMemoryPersistence:
                 scope_key, entries = self.queue.get(timeout=1)
                 self.persistence.save(scope_key, entries)
                 self.queue.task_done()
-                print(f"Saved {scope_key} with {len(entries)} entries")
+                logger.info(f"Saved {scope_key} with {len(entries)} entries")
             except Empty:
                 continue
             except Exception as e:

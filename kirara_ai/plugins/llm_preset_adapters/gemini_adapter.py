@@ -157,7 +157,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
         try:
             response_data = response.json()
         except Exception as e:
-            print(f"API Response: {response.text}")
+            self.logger.error(f"API Response: {response.text}")
             raise e
         content: List[LLMChatContentPartType] = []
         for part in response_data["candidates"][0]["content"]["parts"]:
@@ -222,7 +222,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 return response
             except requests.exceptions.RequestException as e:
                 if i == retry_count - 1:
-                    print(
+                    self.logger.error(
                         f"API Response: {response.text if 'response' in locals() else 'No response'}")
                     raise e
                 else:

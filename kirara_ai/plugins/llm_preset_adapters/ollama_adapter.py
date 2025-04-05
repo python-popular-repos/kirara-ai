@@ -102,7 +102,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 messages.extend([{"role": "tool", "content": part.content} for part in parts])
             else:
                 messages.append(convert_non_tool_message(msg, self.media_manager, loop))
-        print(messages)
+                
         data = {
             "model": req.model,
             "messages": messages,
@@ -128,7 +128,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             response.raise_for_status()
             response_data = response.json()
         except Exception as e:
-            print(f"API Response: {response.text}")
+            self.logger.error(f"API Response: {response.text}")
             raise e
         # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 
