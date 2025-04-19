@@ -66,9 +66,10 @@ class VoyageAdapter(LLMBackendAdapter):
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json"
         }
+        inputs = cast(list[LLMChatTextContent], req.inputs)
         data = {
             "model": req.model,
-            "input": [input.text for input in req.inputs],
+            "input": [input.text for input in inputs],
             "truncation": req.truncate,
             "input_type": req.input_type,
             "output_dimension": req.dimension,
