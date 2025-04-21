@@ -1,13 +1,14 @@
 from pydantic import BaseModel, ConfigDict
-from typing import cast
+from typing import cast, TypedDict, Literal, Optional
 
 import requests
 import asyncio
 
-from kirara_ai.llm.adapter import LLMBackendAdapter
-from kirara_ai.llm.format.request import LLMEmbeddingRequest
+from kirara_ai.llm.adapter import LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol
+from kirara_ai.llm.format.embedding import LLMEmbeddingRequest, LLMEmbeddingResponse
+from kirara_ai.llm.format.rerank import LLMReRankRequest, LLMReRankResponse, ReRankerContent
 from kirara_ai.llm.format.message import LLMChatTextContent, LLMChatImageContent
-from kirara_ai.llm.format.response import LLMEmbeddingResponse, Usage
+from kirara_ai.llm.format.response import Usage
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.logger import get_logger
 
@@ -39,19 +40,28 @@ async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextConte
             })
     return results
 
+class ReRankData(TypedDict):
+    index: int
+    relevance_score: float
+    document: Optional[str]
+
+class ReRankResponse(TypedDict):
+    """给mypy检查用, 顺便给开发者标识返回json的基本结构。"""
+    object: Literal["list"]
+    data: list[ReRankData]
+    model: str
+    usage: dict[Literal["total_tokens"], int]
+
 class VoyageConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.voyageai.com"
     model_config = ConfigDict(frozen=True)
 
-class VoyageAdapter(LLMBackendAdapter):
+class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
     media_manager: MediaManager
 
     def __init__(self, config: VoyageConfig):
         self.config = config
-
-    def chat(self, req):
-        raise NotImplementedError("Voyage adapter not support chat completion. It's only support embedding.")
     
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         # voyage 支持多模态嵌入, 但是两个接口参数不同
@@ -122,3 +132,40 @@ class VoyageAdapter(LLMBackendAdapter):
                 total_tokens=response_data["usage"].get("total_tokens", 0)
             )
         )
+
+    def rerank(self, req: LLMReRankRequest) -> LLMReRankResponse:
+        api_url = f"{self.config.api_base}/v1/rerank"
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "query": req.query,
+            "documents": req.documents,
+            "model": req.model,
+            "top_k": req.top_k,
+            "return_documents": req.return_documents,
+            "truncation": req.truncation
+        }
+
+        # 去除 None 值
+        data = { k:v for k,v in data.items() if v is not None }
+
+        response = requests.post(api_url, headers=headers, json=data)
+        try:
+            response.raise_for_status()
+            response_data: ReRankResponse = response.json()
+        except Exception as e:
+            logger.error(f"Response: {response.text}")
+            raise e
+        
+        return LLMReRankResponse(
+            contents = [ReRankerContent(
+                    document = data.get("document", None),
+                    relevance_score = data["relevance_score"]
+            ) for data in response_data["data"]],
+            usage = Usage(
+                total_tokens = response_data["usage"].get("total_tokens", 0)
+            )
+        )
+        

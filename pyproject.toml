@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kirara-ai"
-version = "3.2.0"
+version = "3.3.0a1"
 authors = [
     { name="Lss233", email="i@lss233.com" },
 ]
 description = "A framework for building AI agents"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
+# mcp组件仅支持python3.10及以上版本
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -50,7 +51,8 @@ dependencies = [
     "Pillow",
     "pytz",
     "sqlalchemy",
-    "alembic"
+    "alembic",
+    "mcp"
 ]
 
 
@@ -73,3 +75,6 @@ default = true
 
 [options]
 include_package_data = true
+
+[tool.mypy]
+disable_error_code = "override, assignment, annotation-unchecked, import-untyped"
