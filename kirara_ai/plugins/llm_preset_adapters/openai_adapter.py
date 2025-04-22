@@ -1,17 +1,18 @@
 import asyncio
 import json
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, cast, Literal, TypedDict
 
 import aiohttp
 import requests
 from pydantic import BaseModel, ConfigDict
 
 import kirara_ai.llm.format.tool as tools
-from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
+from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter, LLMChatProtocol, LLMEmbeddingProtocol
 from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
                                           LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
+from kirara_ai.llm.format.embedding import LLMEmbeddingRequest, LLMEmbeddingResponse
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -97,13 +98,25 @@ def convert_tools_to_openai_format(tools: list[Tool]) -> list[dict]:
         }
     } for tool in tools]
 
+class EmbeddingData(TypedDict):
+    object: Literal["embedding"]
+    embedding: list[float]
+    index: int
+
+class EmbeddingResponse(TypedDict):
+    # 用于描述类型定义
+    object: Literal["list"]
+    data: list[EmbeddingData]
+    model: str
+    usage: dict[Literal["prompt_tokens", "total_tokens"], int]
+
 class OpenAIConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.openai.com/v1"
     model_config = ConfigDict(frozen=True)
 
 
-class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
+class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol, LLMEmbeddingProtocol):
     media_manager: MediaManager
     
     def __init__(self, config: OpenAIConfig):
@@ -182,6 +195,52 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 tool_calls = pick_tool_calls(content),
                 finish_reason=first_choice.get("finish_reason", ""),
             ),
+        )
+    
+    def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
+        """
+        此为openai api嵌入式模型接口
+
+        Tips: openai仅在 text-embedding-3 及以后模型中支持设定向量维度
+        """
+        
+        api_url = f"{self.config.api_base}/v1/embeddings"
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json",
+        }
+        if len(req.inputs) > 2048:
+            # text数组不能超过2048个元素，openai api限制
+            raise ValueError("Text list has too many dimensions, max dimension is 2048")
+        if not all(isinstance(input, LLMChatTextContent) for input in req.inputs):
+            # 未在api中发现多模态嵌入api, 等待后续更新
+            raise ValueError("openai does not support multi-modal embedding")
+        # mypy 类型检查修复，如果添加多模态请去除这个标注
+        inputs = cast(list[LLMChatTextContent], req.inputs)
+        data = {
+            "text": [input.text for input in inputs],
+            "model": req.model,
+            "dimensions": req.dimension,
+            "encoding_format": req.encoding_format,
+            "user": req.user
+        }
+        # 删除 None 字段
+        data = {k: v for k, v in data.items() if v is not None}
+        logger.debug(f"Request: {data}")
+        response = requests.post(api_url, headers=headers, json=data)
+        try:
+            response.raise_for_status()
+            response_data: EmbeddingResponse = response.json()
+        except Exception as e:
+            logger.error(f"Response: {response.text}")
+            raise e
+        logger.debug(f"Response: {response_data}")
+        return LLMEmbeddingResponse(
+            vectors=[data["embedding"] for data in response_data["data"]],
+            usage=Usage(
+                prompt_tokens=response_data["usage"].get("prompt_tokens", 0),
+                total_tokens=response_data["usage"].get("total_tokens", 0)
+            )
         )
 
     async def auto_detect_models(self) -> list[str]:
