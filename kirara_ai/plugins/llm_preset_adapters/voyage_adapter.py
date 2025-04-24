@@ -14,13 +14,12 @@ from kirara_ai.logger import get_logger
 
 logger = get_logger("VoyageAdapter")
 
-async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextContent], media_manager: MediaManager) -> list[dict]:
+async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextContent], media_manager: MediaManager) -> list:
     results = []
     for input in inputs:
         # 因为inputs字段对其中每个元素具有资源显示且较为容易达到
         # 所以将所有输入放到不同的包含键 content 的字典中，而不是放入单个 content所以对应的列表
         if isinstance(input, LLMChatTextContent):
-            input = cast(LLMChatTextContent, input) # 类型标注, cast函数不参与运行时，只是方便在复杂情况下进行类型推导
             results.append({
                 "content": [{
                     "type": "text",
@@ -28,7 +27,6 @@ async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextConte
                 }]
             })
         elif isinstance(input, LLMChatImageContent):
-            input = cast(LLMChatImageContent, input)
             media = media_manager.get_media(input.media_id)
             if media is None:
                 raise ValueError(f"Media {input.media_id} not found")
@@ -52,6 +50,24 @@ class ReRankResponse(TypedDict):
     model: str
     usage: dict[Literal["total_tokens"], int]
 
+class EmbeddingData(TypedDict):
+    object: Literal["embedding"]
+    embedding: list[float | int]
+    index: int
+
+class EmbeddingResponse(TypedDict):
+    object: Literal["list"]
+    data: list[EmbeddingData]
+    model: str
+    usage: dict[Literal["total_tokens"], int]
+
+class ModalEmbeddingResponse(TypedDict):
+    object: Literal["list"]
+    data: list[EmbeddingData]
+    model: str
+    # voyage 的多模态接口会返回三个usage指标: text_tokens: 文字使用token数, image_pixels: 图片像素数, total_tokens: 总token数
+    usage: dict[Literal["text_tokens", "image_pixels", "total_tokens"], int]
+
 class VoyageConfig(BaseModel):
     api_key: str
     api_base: str = "https://api.voyageai.com"
@@ -64,7 +80,7 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         self.config = config
     
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
-        # voyage 支持多模态嵌入, 但是两个接口参数不同
+        # voyage 支持多模态嵌入, 但是两个接口支持的参数不同
         if all(isinstance(input, LLMChatTextContent) for input in req.inputs):
             return self._text_embedding(req)
         else:
@@ -91,7 +107,7 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         response = requests.post(api_url, headers=headers, json=data)
         try:
             response.raise_for_status()
-            response_data = response.json()
+            response_data: EmbeddingResponse = response.json()
         except Exception as e:
             logger.error(f"Response: {response.text}")
             raise e
@@ -109,9 +125,17 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json"
         }
+        # 避免当前线程存在事件循环导致 RuntimeError. 一个线程只能有一个事件循环循环
+        try: 
+            # 自python 3.12 起使用该函数将抛出 **弃用** 警告，请尝试该用 asyncio.get_running_loop() Added in version 3.7
+            # loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         data = {
             "model": req.model,
-            "inputs": asyncio.run(resolve_media_base64(req.inputs, media_manager)),
+            "inputs": loop.run_until_complete(resolve_media_base64(req.inputs, media_manager)),
             "input_type": req.input_type,
             "truncation": req.truncate,
             "output_encoding": req.encoding_format
@@ -121,7 +145,7 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         response = requests.post(api_url, headers=headers, json=data)
         try:
             response.raise_for_status()
-            response_data = response.json()
+            response_data: ModalEmbeddingResponse = response.json()
         except Exception as e:
             logger.error(f"Response: {response.text}")
             raise e

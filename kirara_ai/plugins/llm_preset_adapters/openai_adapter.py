@@ -21,7 +21,7 @@ from .utils import pick_tool_calls
 
 logger = get_logger("OpenAIAdapter")
 
-async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list[dict]:
+async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list | list[dict]:
     if messages.role == "tool":
         # typing.cast 指定类型，避免mypy报错
         elements = cast(list[LLMToolResultContent], messages.content)
@@ -116,7 +116,7 @@ class OpenAIConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol, LLMEmbeddingProtocol):
+class OpenAIAdapterChatBase(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol):
     media_manager: MediaManager
     
     def __init__(self, config: OpenAIConfig):
@@ -197,11 +197,22 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
             ),
         )
     
+    async def auto_detect_models(self) -> list[str]:
+        api_url = f"{self.config.api_base}/models"
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            async with session.get(
+                api_url, headers={"Authorization": f"Bearer {self.config.api_key}"}
+            ) as response:
+                response.raise_for_status()
+                response_data = await response.json()
+                return [model["id"] for model in response_data["data"]]
+
+class OpenAIAdapter(OpenAIAdapterChatBase, LLMEmbeddingProtocol):
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         """
         此为openai api嵌入式模型接口
 
-        Tips: openai仅在 text-embedding-3 及以后模型中支持设定向量维度
+        Tips: openai仅在 text-embedding-3 及以后模型中支持设定输出向量维度
         """
         
         api_url = f"{self.config.api_base}/v1/embeddings"
@@ -221,8 +232,7 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
             "text": [input.text for input in inputs],
             "model": req.model,
             "dimensions": req.dimension,
-            "encoding_format": req.encoding_format,
-            "user": req.user
+            "encoding_format": req.encoding_format
         }
         # 删除 None 字段
         data = {k: v for k, v in data.items() if v is not None}
@@ -242,13 +252,3 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
                 total_tokens=response_data["usage"].get("total_tokens", 0)
             )
         )
-
-    async def auto_detect_models(self) -> list[str]:
-        api_url = f"{self.config.api_base}/models"
-        async with aiohttp.ClientSession(trust_env=True) as session:
-            async with session.get(
-                api_url, headers={"Authorization": f"Bearer {self.config.api_key}"}
-            ) as response:
-                response.raise_for_status()
-                response_data = await response.json()
-                return [model["id"] for model in response_data["data"]]

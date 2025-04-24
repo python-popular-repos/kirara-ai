@@ -20,7 +20,6 @@ class LLMEmbeddingRequest(BaseModel):
         model (str): 使用的embedding模型名
         dimensions (Optional[int]): embedding向量的维度
         encoding_format (Optional[FormatType]): embedding的编码格式。推荐不设置该字段, 方便直接输入数据库
-        user (Optional[str]): 用户名, openai可选字段目前不知道有什么用
         input_type (Optional[InputType]): 输入类型, 归属于voyage_adapter的独有字段
         truncate (Optional[bool]): 是否自动截断超长文本, 以适应llm上下文长度上限。
         output_type (Optional[OutputType]): 向量内部应该使用哪种数据类型. 一般默认float
@@ -29,12 +28,11 @@ class LLMEmbeddingRequest(BaseModel):
     model: str
     dimension: Optional[int] = None
     encoding_format: Optional[FormatType] = None
-    user: Optional[str] = None
     input_type: Optional[InputType] = None
     truncate: Optional[bool] = None
     output_type: Optional[OutputType] = None
 
-vector = list[float | int] # 后续可能需要使用numpy库进行精确的数据类型标注
+vector = list[float | int] # 后续可能需要使用numpy库进行精确的数据类型标注, 暂时未处理base64的返回模式
 class LLMEmbeddingResponse(BaseModel):
     """
     向量维度请使用len(vector)自行计算。
