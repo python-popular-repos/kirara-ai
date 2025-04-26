@@ -7,6 +7,7 @@ import requests
 from pydantic import BaseModel, ConfigDict
 
 import kirara_ai.llm.format.tool as tools
+from kirara_ai.config.global_config import ModelConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
                                           LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
@@ -16,7 +17,7 @@ from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
 
-from .utils import pick_tool_calls
+from .utils import guess_openai_model, pick_tool_calls
 
 logger = get_logger("OpenAIAdapter")
 
@@ -96,6 +97,7 @@ def convert_tools_to_openai_format(tools: list[Tool]) -> list[dict]:
             "strict": tool.strict,
         }
     } for tool in tools]
+    
 
 class OpenAIConfig(BaseModel):
     api_key: str
@@ -183,8 +185,8 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                 finish_reason=first_choice.get("finish_reason", ""),
             ),
         )
-
-    async def auto_detect_models(self) -> list[str]:
+        
+    async def get_models(self) -> list[str]:
         api_url = f"{self.config.api_base}/models"
         async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(
@@ -192,4 +194,15 @@ class OpenAIAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             ) as response:
                 response.raise_for_status()
                 response_data = await response.json()
-                return [model["id"] for model in response_data["data"]]
+                return [model["id"] for model in response_data.get("data", [])]
+
+
+    async def auto_detect_models(self) -> list[ModelConfig]:
+        models = await self.get_models()
+        all_models: list[ModelConfig] = []
+        for model in models:
+            guess_result = guess_openai_model(model)
+            if guess_result is None:
+                continue
+            all_models.append(ModelConfig(id=model, type=guess_result[0].value, ability=guess_result[1]))
+        return all_models

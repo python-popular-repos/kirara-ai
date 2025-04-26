@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from kirara_ai.llm.model_types import LLMAbility, ModelType
 
 
 class IMConfig(BaseModel):
@@ -12,6 +14,15 @@ class IMConfig(BaseModel):
     config: Dict[str, Any] = Field(default={}, description="IM的配置")
 
 
+class ModelConfig(BaseModel):
+    """模型配置"""
+    
+    id: str = Field(description="模型标识ID")
+    type: str = Field(default=ModelType.LLM.value, description="模型类型：llm/embedding/image_generation等")
+    ability: int = Field(description="模型能力，对应模型类型的Ability枚举值")
+
+    model_config = ConfigDict(extra="allow")
+
 class LLMBackendConfig(BaseModel):
     """LLM后端配置"""
 
@@ -19,7 +30,32 @@ class LLMBackendConfig(BaseModel):
     adapter: str = Field(description="LLM适配器类型")
     config: Dict[str, Any] = Field(default={}, description="后端配置")
     enable: bool = Field(default=True, description="是否启用")
-    models: List[str] = Field(default=[], description="支持的模型列表")
+    models: List[ModelConfig] = Field(
+        default=[], description="支持的模型列表"
+    )
+    
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_models_format(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        自动迁移模型配置格式
+        将旧格式的字符串ID列表转换为新格式的ModelConfig对象列表
+        """
+        if "models" in data and isinstance(data["models"], list):
+            # 创建新的模型列表
+            new_models = []
+            
+            for model in data["models"]:
+                if isinstance(model, str):
+                    # 旧格式：字符串ID，转换为ModelConfig
+                    new_models.append(ModelConfig(id=model, type=ModelType.LLM.value, ability=LLMAbility.TextChat.value))
+                else:
+                    # 新格式或已迁移的模型配置，保持不变
+                    new_models.append(model)
+            
+            data["models"] = new_models
+            
+        return data
 
 
 class LLMConfig(BaseModel):

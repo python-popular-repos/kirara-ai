@@ -26,7 +26,7 @@ class RandomChanceMatchRule(DispatchRule):
         super().__init__(workflow_registry, workflow_id)
         self.chance = chance
 
-    def match(self, message: IMMessage) -> bool:
+    def match(self, message: IMMessage, container: DependencyContainer) -> bool:
         print(f"Random chance: {self.chance}")
         print(f"Random number: {random.random()}")
         return random.random() * 100 < self.chance
