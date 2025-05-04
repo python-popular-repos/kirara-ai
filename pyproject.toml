@@ -51,7 +51,10 @@ dependencies = [
     "pytz",
     "sqlalchemy",
     "alembic",
-    "mcp"
+    "mcp",
+    "python-lsp-server",
+    "jedi",
+    "pyflakes",
 ]
 
 
