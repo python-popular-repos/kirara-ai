@@ -187,16 +187,12 @@ class LLMManager:
         :param ability: 指定的能力
         :return: 支持的模型ID列表
         """
-        supported_models = []
-        
-        for model_id, model_config in self.model_info.items():
-            # 只考虑LLM类型且能力值与请求的能力匹配的模型
-            if model_config.type == model_type.value and \
-                ability.is_capable(model_config.ability):
-                    
-                supported_models.append(model_id)
-                
-        return supported_models
+        return [
+            model_id
+            for model_id, model_config in self.model_info.items()
+            if model_config.type == model_type.value
+            and ability.is_capable(model_config.ability)
+        ]
 
     @deprecated("请使用 get_supported_models 方法")
     def get_llm_id_by_ability(self, ability: ModelAbility) -> Optional[str]:
@@ -207,9 +203,7 @@ class LLMManager:
         :return: 符合要求的模型ID，如果没有找到则返回None
         """
         supported_models = self.get_supported_models(ModelType.LLM, ability)
-        if not supported_models:
-            return None
-        return random.choice(supported_models)
+        return None if not supported_models else random.choice(supported_models)
     
     def get_models_by_ability(self, model_type: ModelType, ability: ModelAbility) -> Optional[str]:
         """

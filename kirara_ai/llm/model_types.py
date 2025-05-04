@@ -17,10 +17,10 @@ class ModelType(Enum):
         """
         从字符串转换为ModelType枚举
         """
-        for enum_value in cls:
-            if enum_value.value == value:
-                return enum_value
-        return cls.LLM  # 默认返回LLM类型
+        return next(
+            (enum_value for enum_value in cls if enum_value.value == value),
+            cls.LLM,
+        )
 
 class ModelAbility(Enum):
     
