@@ -16,6 +16,14 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
     """检查强制函数声明的诊断器"""
 
     SOURCE_NAME: str = "mandatory-function-check"
+    
+    config: Optional[Dict[str, Any]] = None
+    config_name: Optional[str] = None
+    config_params: Optional[List[Dict[str, Any]]] = None
+    config_return: Optional[str] = None
+    param_signatures: Optional[List[str]] = None
+    expected_signature_str: Optional[str] = None
+    expected_signature_data: Optional[Dict[str, Any]] = None
 
     def __init__(self, ls: LanguageServer, config: Optional[Dict[str, Any]]):
         super().__init__(ls)
@@ -39,8 +47,10 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
         """
         try:
             self.config = config
+            assert self.config is not None
             self.config_name = self.config["name"]
             self.config_params = self.config["params"]
+            assert self.config_params is not None
             self.config_return = self.config["return_type"]
             self.param_signatures = [
                 f"{p['name']}: {p['type_hint']}" for p in self.config_params]
@@ -62,7 +72,7 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
     def check(self, doc: Document) -> List[Diagnostic]:
         """检查源代码是否包含配置的强制函数声明"""
         diagnostics: List[Diagnostic] = []
-        if not self.config:
+        if not self.config or not self.config_params:
             return diagnostics
 
         source = doc.source
@@ -201,7 +211,7 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
 
     def get_code_actions(self, params: CodeActionParams, relevant_diagnostics: List[Diagnostic]) -> List[CodeAction]:
         """为强制函数错误提供代码操作"""
-        actions = []
+        actions: List[CodeAction] = []
         doc_uri = params.text_document.uri
         document = self.ls.workspace.get_document(doc_uri)
         if not document or not self.config:  # Need document and config for actions
