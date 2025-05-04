@@ -97,8 +97,8 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
                                 "type_hint", "")
 
                             # Normalize empty/Any types for comparison
-                            norm_arg_type = arg_type_str if arg_type_str else "Any"
-                            norm_config_type = config_type_hint if config_type_hint else "Any"
+                            norm_arg_type = arg_type_str or "Any"
+                            norm_config_type = config_type_hint or "Any"
 
                             types_match = (norm_arg_type == norm_config_type)
 
@@ -118,8 +118,8 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
                     return_type_str = self._ast_node_to_string(node.returns)
                     config_return_type = self.config_return or ""
 
-                    norm_return_type = return_type_str if return_type_str else "Any"
-                    norm_config_return = config_return_type if config_return_type else "Any"
+                    norm_return_type = return_type_str or "Any"
+                    norm_config_return = config_return_type or "Any"
 
                     return_match = (norm_return_type == norm_config_return)
 
@@ -243,12 +243,5 @@ class MandatoryFunctionDiagnostic(BaseDiagnostic):
                     is_preferred=True  # Make it the default action if possible
                 )
                 actions.append(action)
-
-            elif fix_type == "replace_signature":
-                # As noted before, replacing the signature is complex and potentially destructive.
-                # We will not implement the automatic fix for this case.
-                # We could offer a different kind of action, like "Show expected signature".
-                # No automatic fix action for replacing signature for now.
-                pass
 
         return actions

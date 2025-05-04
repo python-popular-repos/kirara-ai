@@ -145,14 +145,13 @@ class BaseDiagnostic(ABC):
             import sys
             if sys.version_info >= (3, 9):
                 return ast.unparse(node)
-            else:
-                # Basic fallback for older Python versions if unparse not available
-                if isinstance(node, ast.Expr):
-                    return self._ast_node_to_string(node.value)
-                # Add more fallbacks if needed
-                logger.debug(
-                    f"Cannot convert AST node to string (unparse unavailable): {type(node)}")
-                return "UnsupportedType"
+            # 如果 unparse 不可用，则为旧版本 Python 的基本回退
+            if isinstance(node, ast.Expr):
+                return self._ast_node_to_string(node.value)
+            # 如果需要，添加更多回退
+            logger.debug(
+                f"无法将 AST 节点转换为字符串（unparse 不可用）：{type(node)}")
+            return "UnsupportedType"
         except Exception as e:
             logger.debug(f"Error using ast.unparse: {e}")
         return "UnsupportedType"  # Final fallback

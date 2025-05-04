@@ -36,7 +36,7 @@ class JediSyntaxErrorDiagnostic(BaseDiagnostic):
         try:
             # 使用 Jedi 创建 Script 对象
             # 注意：即使代码有语法错误，Jedi 通常也能创建 Script 对象
-            script = jedi.Script(code=source, path=path if path else None)
+            script = jedi.Script(code=source, path=path or None)
 
             # 获取语法错误
             syntax_errors = script.get_syntax_errors()

@@ -33,7 +33,7 @@ class ImportDiagnostic(BaseDiagnostic):
             # Avoid using names like 'src', 'lib' directly unless structure confirms it
             # A better approach might involve analyzing project structure or sys.path
             # Let's assume basename is the package for resolve_name context
-            package_name = potential_pkg_name if potential_pkg_name else None
+            package_name = potential_pkg_name or None
 
         except Exception:
             logger.warning(f"无法确定 '{path}' 的包上下文")
@@ -142,8 +142,7 @@ class ImportDiagnostic(BaseDiagnostic):
                             if resolved_spec is None:
                                 error_message = f"无法找到模块 '{module_name_str}'"
 
-                    # ValueError for invalid package name etc.
-                    except (ModuleNotFoundError, ImportError, ValueError) as e:
+                    except (ImportError, ValueError) as e:
                         error_message = f"无法解析或找到导入 '{resolving_name}': {e}"
                     except Exception as e:
                         error_message = f"检查导入 '{resolving_name}' 时发生意外错误: {e}"
