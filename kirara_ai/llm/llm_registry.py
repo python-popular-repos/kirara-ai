@@ -2,8 +2,10 @@ from typing import Dict, Optional, Type
 
 from pydantic import BaseModel
 
-from kirara_ai.llm.adapter import LLMBackendAdapter
 from kirara_ai.logger import get_logger
+
+from .adapter import LLMBackendAdapter
+from .model_types import LLMAbility  # noqa: F401
 
 
 class LLMBackendRegistry:
@@ -24,6 +26,7 @@ class LLMBackendRegistry:
         adapter_type: str,
         adapter_class: Type[LLMBackendAdapter],
         config_class: Type[BaseModel],
+        *args, **kwargs
     ):
         """
         注册一个LLM后端适配器
