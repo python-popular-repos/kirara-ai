@@ -5,6 +5,7 @@ from kirara_ai.logger import get_logger
 from kirara_ai.workflow.core.dispatch.models.dispatch_rules import CombinedDispatchRule
 from kirara_ai.workflow.core.dispatch.registry import DispatchRuleRegistry
 from kirara_ai.workflow.core.dispatch.rules.base import DispatchRule
+from kirara_ai.workflow.core.execution.exceptions import WorkflowExecutionTimeoutException
 from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 from kirara_ai.workflow.core.workflow.base import Workflow
 from kirara_ai.workflow.core.workflow.registry import WorkflowRegistry
@@ -51,6 +52,9 @@ class WorkflowDispatcher:
                         executor = WorkflowExecutor(scoped_container)
                         scoped_container.register(WorkflowExecutor, executor)
                         return await executor.run()
+                    except WorkflowExecutionTimeoutException as e:
+                        self.logger.error(f"Workflow execution timed out: {e}")
+                        return None
                     except Exception as e:
                         self.logger.opt(exception=e).error(f"Workflow execution failed: {e}")
                         return None

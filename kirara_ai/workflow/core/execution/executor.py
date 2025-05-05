@@ -10,7 +10,8 @@ from kirara_ai.ioc.inject import Inject
 from kirara_ai.logger import get_logger
 from kirara_ai.workflow.core.block import Block, ConditionBlock, LoopBlock
 from kirara_ai.workflow.core.block.registry import BlockRegistry
-from kirara_ai.workflow.core.execution.exceptions import BlockExecutionFailedException
+from kirara_ai.workflow.core.execution.exceptions import (BlockExecutionFailedException,
+                                                          WorkflowExecutionTimeoutException)
 from kirara_ai.workflow.core.workflow import Workflow
 
 
@@ -66,7 +67,6 @@ class WorkflowExecutor:
             # 将目标块添加到源块的执行图中
             self.execution_graph[wire.source_block].append(wire.target_block)
             # self.logger.debug(f"Added edge: {wire.source_block.name} -> {wire.target_block.name}")
-
     async def run(self) -> Dict[str, Any]:
         """
         执行工作流，返回每个块的执行结果。
@@ -77,11 +77,21 @@ class WorkflowExecutor:
         self.event_bus.post(WorkflowExecutionBegin(self.workflow, self))
         self.logger.info("Starting workflow execution")
         loop = asyncio.get_event_loop()
+        max_timeout = self.workflow.config.max_execution_time
         with ThreadPoolExecutor() as executor:
             # 从入口节点开始执行
             entry_blocks = [block for block in self.workflow.blocks if not block.inputs]
             # self.logger.debug(f"Identified entry blocks: {[b.name for b in entry_blocks]}")
-            await self._execute_nodes(entry_blocks, executor, loop)
+            
+            if max_timeout > 0:
+                try:
+                    async with asyncio.timeout(max_timeout):
+                        await self._execute_nodes(entry_blocks, executor, loop)
+                except asyncio.TimeoutError as e:
+                    self.event_bus.post(WorkflowExecutionEnd(self.workflow, self, self.results))
+                    raise WorkflowExecutionTimeoutException(f"Workflow execution timed out after {max_timeout} seconds") from e
+            else:
+                await self._execute_nodes(entry_blocks, executor, loop)
 
         self.logger.info("Workflow execution completed")
         self.event_bus.post(WorkflowExecutionEnd(self.workflow, self, self.results))
