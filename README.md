@@ -226,7 +226,7 @@
 使用 `加载预设 猫娘` 来加载猫娘预设。
 
 下面是一些预设的小视频，你可以看看效果：
-* MOSS： https://www.bilibili.com/video/av309604568
+* MOSS： https://www.bilibili.com/video/av352047018
 * 丁真：https://www.bilibili.com/video/av267013053
 * 小黑子：https://www.bilibili.com/video/av309604568
 * 高启强：https://www.bilibili.com/video/av779555493
