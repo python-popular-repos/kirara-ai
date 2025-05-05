@@ -78,7 +78,8 @@ class WorkflowExecutor:
         self.logger.info("Starting workflow execution")
         loop = asyncio.get_event_loop()
         max_timeout = self.workflow.config.max_execution_time
-        if max_timeout < 0:
+        if max_timeout <= 0:
+            # 如果超时时间小于等于0，则不限制超时
             max_timeout = None
         with ThreadPoolExecutor() as executor:
             # 从入口节点开始执行
