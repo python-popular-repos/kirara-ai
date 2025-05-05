@@ -78,20 +78,19 @@ class WorkflowExecutor:
         self.logger.info("Starting workflow execution")
         loop = asyncio.get_event_loop()
         max_timeout = self.workflow.config.max_execution_time
+        if max_timeout <= 0:
+            # 如果超时时间小于等于0，则不限制超时
+            max_timeout = None
         with ThreadPoolExecutor() as executor:
             # 从入口节点开始执行
             entry_blocks = [block for block in self.workflow.blocks if not block.inputs]
             # self.logger.debug(f"Identified entry blocks: {[b.name for b in entry_blocks]}")
-            
-            if max_timeout > 0:
-                try:
-                    async with asyncio.timeout(max_timeout):
-                        await self._execute_nodes(entry_blocks, executor, loop)
-                except asyncio.TimeoutError as e:
-                    self.event_bus.post(WorkflowExecutionEnd(self.workflow, self, self.results))
-                    raise WorkflowExecutionTimeoutException(f"Workflow execution timed out after {max_timeout} seconds") from e
-            else:
-                await self._execute_nodes(entry_blocks, executor, loop)
+            try:
+                async with asyncio.timeout(max_timeout): # type: ignore
+                    await self._execute_nodes(entry_blocks, executor, loop)
+            except asyncio.TimeoutError as e:
+                self.event_bus.post(WorkflowExecutionEnd(self.workflow, self, self.results))
+                raise WorkflowExecutionTimeoutException(f"Workflow execution timed out after {max_timeout} seconds") from e
 
         self.logger.info("Workflow execution completed")
         self.event_bus.post(WorkflowExecutionEnd(self.workflow, self, self.results))

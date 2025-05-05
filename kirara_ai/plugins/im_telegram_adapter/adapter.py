@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from telegram import Bot, ChatFullInfo, Update, User
+from telegram.constants import MessageEntityType
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from telegramify_markdown import markdownify
 
@@ -104,11 +105,11 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
         message_elements: List[MessageElement] = []
         raw_message_dict = raw_message.message.to_dict()
         # 处理文本消息
-        if raw_message.message.text:
-            text = raw_message.message.text
+        if raw_message.message.text is not None or raw_message.message.caption is not None:
+            text: str = raw_message.message.text or raw_message.message.caption # type: ignore
             offset = 0
-            for entity in raw_message.message.entities or []:
-                if entity.type in ("mention", "text_mention"):
+            for entity in raw_message.message.entities or raw_message.message.caption_entities or []:
+                if entity.type in (MessageEntityType.MENTION, MessageEntityType.TEXT_MENTION):
                     # Extract mention text
                     mention_text = text[entity.offset:entity.offset + entity.length]
 
