@@ -91,7 +91,7 @@ class TypeSystem:
             # 检查类型兼容性
             try:
                 # 任何类型都可以兼容 Any 类型
-                if target_type == "Any":
+                if target_type == "Any" or source_type == "Any":
                     result = True
                 else:
                     result = issubclass(source_class, target_class)
