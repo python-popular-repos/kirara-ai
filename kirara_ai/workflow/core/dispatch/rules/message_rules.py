@@ -48,10 +48,14 @@ class PrefixMatchRule(DispatchRule):
         self.prefix = prefix
 
     def match(self, message: IMMessage, container: DependencyContainer) -> bool:
-        for message_element in message.message_elements:
-            if isinstance(message_element, TextMessage):
-                return message_element.text.startswith(self.prefix)
-        return False
+        return next(
+            (
+                message_element.text.startswith(self.prefix)
+                for message_element in message.message_elements
+                if isinstance(message_element, TextMessage)
+            ),
+            False,
+        )
 
     def get_config(self) -> PrefixRuleConfig:
         return PrefixRuleConfig(prefix=self.prefix)
