@@ -150,6 +150,11 @@ class TracingConfig(BaseModel):
     
     llm_tracing_content: bool = Field(default=False, description="是否记录 LLM 请求内容")
 
+class MediaConfig(BaseModel):
+    """媒体配置"""
+    cleanup_duration: int = Field(default=30, description="间隔多少天清理一次媒体文件")
+    auto_remove_unreferenced: bool = Field(default=True, description="是否自动删除未引用的媒体文件")
+    last_cleanup_time: int = Field(default=0, description="上次清理时间")
 
 class GlobalConfig(BaseModel):
     ims: List[IMConfig] = Field(default=[], description="IM配置列表")
@@ -163,5 +168,6 @@ class GlobalConfig(BaseModel):
     frpc: FrpcConfig = FrpcConfig()
     system: SystemConfig = SystemConfig()
     tracing: TracingConfig = TracingConfig()
+    media: MediaConfig = MediaConfig()
 
     model_config = ConfigDict(extra="allow")
