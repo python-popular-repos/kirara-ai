@@ -3,11 +3,15 @@ import base64
 import hashlib
 import json
 import shutil
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import aiofiles
 
+from kirara_ai.config.config_loader import CONFIG_FILE, ConfigLoader
+from kirara_ai.config.global_config import GlobalConfig
+from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
 from kirara_ai.media.metadata import MediaMetadata
 from kirara_ai.media.types.media_type import MediaType
@@ -33,6 +37,7 @@ class MediaManager:
         self.media_dir.mkdir(parents=True, exist_ok=True)
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
         self.files_dir.mkdir(parents=True, exist_ok=True)
+        self._cleanup_task = None
         
         # 加载所有元数据
         self._load_all_metadata()
@@ -588,7 +593,6 @@ class MediaManager:
             if not metadata.references:
                 self.delete_media(media_id)
                 count += 1
-        
         return count
     
     async def create_media_message(self, media_id: str) -> Optional["MediaMessage"]:
@@ -621,3 +625,21 @@ class MediaManager:
             print("new MediaManager")
             cls._instance = super(MediaManager, cls).__new__(cls)
         return cls._instance
+    
+    def setup_cleanup_task(self, container: DependencyContainer):
+        """设置清理任务"""
+        config = container.resolve(GlobalConfig)
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+        if config.media.auto_remove_unreferenced and config.media.cleanup_duration > 0:
+            duration = config.media.cleanup_duration
+            async def schedule_cleanup():
+                while True:
+                    last_cleanup_time = config.media.last_cleanup_time
+                    next_cleanup_time = last_cleanup_time + duration * 24 * 60 * 60
+                    await asyncio.sleep(next_cleanup_time - time.time())
+                    count = self.cleanup_unreferenced()
+                    self.logger.info(f"Cleanup {count} unreferenced media files")
+                    config.media.last_cleanup_time = int(time.time())
+                    ConfigLoader.save_config_with_backup(CONFIG_FILE, config)
+            self._cleanup_task = asyncio.create_task(schedule_cleanup())

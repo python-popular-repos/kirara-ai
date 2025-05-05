@@ -4,14 +4,15 @@ from typing import Any, List, cast
 import aiohttp
 import requests
 from pydantic import BaseModel, ConfigDict
-from mcp.types import TextContent, ImageContent, EmbeddedResource
 
 import kirara_ai.llm.format.tool as tools
+from kirara_ai.config.global_config import ModelConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
                                           LLMChatTextContent, LLMToolCallContent, LLMToolResultContent)
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
+from kirara_ai.llm.model_types import LLMAbility, ModelType
 from kirara_ai.logger import get_logger
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -166,10 +167,10 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             )
         )
 
-    async def auto_detect_models(self) -> list[str]:
+    async def auto_detect_models(self) -> list[ModelConfig]:
         api_url = f"{self.config.api_base}/api/tags"
         async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(api_url) as response:
                 response.raise_for_status()
                 response_data = await response.json()
-                return [tag["name"] for tag in response_data["models"]]
+                return [ModelConfig(id=tag["name"], type=ModelType.LLM.value, ability=LLMAbility.TextChat.value) for tag in response_data["models"]]

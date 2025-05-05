@@ -11,7 +11,7 @@ from kirara_ai.llm.format.message import LLMChatContentPartType, LLMChatImageCon
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse
 from kirara_ai.llm.llm_manager import LLMManager
-from kirara_ai.llm.llm_registry import LLMAbility
+from kirara_ai.llm.model_types import LLMAbility, ModelType
 from kirara_ai.logger import get_logger
 from kirara_ai.memory.composes.base import ComposableMessageType
 from kirara_ai.workflow.core.block import Block, Input, Output, ParamMeta
@@ -20,7 +20,7 @@ from kirara_ai.workflow.core.execution.executor import WorkflowExecutor
 
 def model_name_options_provider(container: DependencyContainer, block: Block) -> List[str]:
     llm_manager: LLMManager = container.resolve(LLMManager)
-    return sorted(llm_manager.get_supported_models(LLMAbility.TextChat))
+    return sorted(llm_manager.get_supported_models(ModelType.LLM, LLMAbility.TextChat))
 
 
 class ChatMessageConstructor(Block):

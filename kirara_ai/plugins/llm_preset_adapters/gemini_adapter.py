@@ -7,11 +7,13 @@ import requests
 from pydantic import BaseModel, ConfigDict
 
 import kirara_ai.llm.format.tool as tool
+from kirara_ai.config.global_config import ModelConfig
 from kirara_ai.llm.adapter import AutoDetectModelsProtocol, LLMBackendAdapter
 from kirara_ai.llm.format.message import (LLMChatContentPartType, LLMChatImageContent, LLMChatMessage,
                                           LLMChatTextContent, LLMToolCallContent, LLMToolResultContent, RoleType)
 from kirara_ai.llm.format.request import LLMChatRequest, Tool
 from kirara_ai.llm.format.response import LLMChatResponse, Message, Usage
+from kirara_ai.llm.model_types import LLMAbility, ModelType
 from kirara_ai.logger import get_logger
 from kirara_ai.media import MediaManager
 from kirara_ai.tracing import trace_llm_chat
@@ -247,7 +249,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
             ),
         )
 
-    async def auto_detect_models(self) -> list[str]:
+    async def auto_detect_models(self) -> list[ModelConfig]:
         api_url = f"{self.config.api_base}/models"
         async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(
@@ -258,7 +260,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol):
                     response.raise_for_status()
                 response_data = await response.json()
                 return [
-                    model["name"].removeprefix("models/")
+                    ModelConfig(id=model["name"].removeprefix("models/"), type=ModelType.LLM.value, ability=LLMAbility.TextChat.value)
                     for model in response_data["models"]
                     if "generateContent" in model["supportedGenerationMethods"]
                 ]

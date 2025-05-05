@@ -245,10 +245,14 @@ class TelegramAdapter(IMAdapter, UserProfileAdapter, EditStateAdapter, BotProfil
     async def stop(self):
         """停止 Bot"""
         assert self.application.updater
-        
-        await self.application.updater.stop()
-        await self.application.stop()
-        await self.application.shutdown()
+        try:
+            if self.application.updater.running:
+                await self.application.updater.stop()
+            if self.application.running:
+                await self.application.stop()
+            await self.application.shutdown()
+        except:
+            pass
 
     async def set_chat_editing_state(
         self, chat_sender: ChatSender, is_editing: bool = True
