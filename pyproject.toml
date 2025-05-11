@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kirara-ai"
-version = "3.3.0a1"
+version = "3.3.0a2"
 authors = [
     { name="Lss233", email="i@lss233.com" },
 ]
@@ -52,7 +52,10 @@ dependencies = [
     "pytz",
     "sqlalchemy",
     "alembic",
-    "mcp"
+    "mcp",
+    "pygls",
+    "jedi",
+    "pyflakes",
 ]
 
 

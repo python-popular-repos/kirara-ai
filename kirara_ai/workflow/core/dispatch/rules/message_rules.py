@@ -3,7 +3,7 @@ from typing import List
 
 from pydantic import Field
 
-from kirara_ai.im.message import IMMessage, MentionElement
+from kirara_ai.im.message import IMMessage, MentionElement, TextMessage
 from kirara_ai.im.sender import ChatSender
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.workflow.core.workflow.registry import WorkflowRegistry
@@ -48,7 +48,14 @@ class PrefixMatchRule(DispatchRule):
         self.prefix = prefix
 
     def match(self, message: IMMessage, container: DependencyContainer) -> bool:
-        return message.content.startswith(self.prefix)
+        return next(
+            (
+                message_element.text.startswith(self.prefix)
+                for message_element in message.message_elements
+                if isinstance(message_element, TextMessage)
+            ),
+            False,
+        )
 
     def get_config(self) -> PrefixRuleConfig:
         return PrefixRuleConfig(prefix=self.prefix)

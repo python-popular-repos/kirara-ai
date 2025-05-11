@@ -74,7 +74,7 @@ class ChatSenderMismatchRule(DispatchRule):
         self.sender_id = sender_id
         self.sender_group = sender_group
 
-    def match(self, message: IMMessage) -> bool:
+    def match(self, message: IMMessage, container: DependencyContainer) -> bool:
         # 如果设置了群组ID，则必须不匹配
         if self.sender_group and message.sender.group_id == self.sender_group:
             return False
@@ -114,7 +114,7 @@ class ChatTypeMatchRule(DispatchRule):
         super().__init__(workflow_registry, workflow_id)
         self.chat_type = chat_type
 
-    def match(self, message: IMMessage) -> bool:
+    def match(self, message: IMMessage, container: DependencyContainer) -> bool:
         return message.sender.chat_type == self.chat_type
 
     def get_config(self) -> ChatTypeMatchRuleConfig:

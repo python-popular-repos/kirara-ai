@@ -13,7 +13,6 @@ from .volcengine_adapter import VolcengineAdapter, VolcengineConfig
 from .mistral_adapter import MistralAdapter, MistralConfig
 from .voyage_adapter import VoyageAdapter, VoyageConfig
 
-from kirara_ai.llm.llm_registry import LLMAbility
 from kirara_ai.logger import get_logger
 from kirara_ai.plugin_manager.plugin import Plugin
 
@@ -26,43 +25,43 @@ class LLMPresetAdaptersPlugin(Plugin):
 
     def on_load(self):
         self.llm_registry.register(
-            "OpenAI", OpenAIAdapter, OpenAIConfig, LLMAbility.TextChat
+            "OpenAI", OpenAIAdapter, OpenAIConfig
         )
         self.llm_registry.register(
-            "DeepSeek", DeepSeekAdapter, DeepSeekConfig, LLMAbility.TextChat
+            "DeepSeek", DeepSeekAdapter, DeepSeekConfig
         )
         self.llm_registry.register(
-            "Gemini", GeminiAdapter, GeminiConfig, LLMAbility.TextChat
+            "Gemini", GeminiAdapter, GeminiConfig
         )
         self.llm_registry.register(
-            "Ollama", OllamaAdapter, OllamaConfig, LLMAbility.TextChat
+            "Ollama", OllamaAdapter, OllamaConfig
         )
         self.llm_registry.register(
-            "Claude", ClaudeAdapter, ClaudeConfig, LLMAbility.TextChat
+            "Claude", ClaudeAdapter, ClaudeConfig
         )
         self.llm_registry.register(
-            "SiliconFlow", SiliconFlowAdapter, SiliconFlowConfig, LLMAbility.TextChat
+            "SiliconFlow", SiliconFlowAdapter, SiliconFlowConfig
         )
         self.llm_registry.register(
-            "TencentCloud", TencentCloudAdapter, TencentCloudConfig, LLMAbility.TextChat
+            "TencentCloud", TencentCloudAdapter, TencentCloudConfig
         )
         self.llm_registry.register(
-            "AlibabaCloud", AlibabaCloudAdapter, AlibabaCloudConfig, LLMAbility.TextChat
+            "AlibabaCloud", AlibabaCloudAdapter, AlibabaCloudConfig
         )
         self.llm_registry.register(
-            "Moonshot", MoonshotAdapter, MoonshotConfig, LLMAbility.TextChat
+            "Moonshot", MoonshotAdapter, MoonshotConfig
         )
         self.llm_registry.register(
-            "OpenRouter", OpenRouterAdapter, OpenRouterConfig, LLMAbility.TextChat
+            "OpenRouter", OpenRouterAdapter, OpenRouterConfig
         )
         self.llm_registry.register(
-            "Minimax", MinimaxAdapter, MinimaxConfig, LLMAbility.TextChat
+            "Minimax", MinimaxAdapter, MinimaxConfig
         )
         self.llm_registry.register(
-            "Volcengine", VolcengineAdapter, VolcengineConfig, LLMAbility.TextChat
+            "Volcengine", VolcengineAdapter, VolcengineConfig
         )
         self.llm_registry.register(
-            "Mistral", MistralAdapter, MistralConfig, LLMAbility.TextChat
+            "Mistral", MistralAdapter, MistralConfig
         )
         logger.info("LLMPresetAdaptersPlugin loaded")
 

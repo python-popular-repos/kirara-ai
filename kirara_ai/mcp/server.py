@@ -168,9 +168,11 @@ class MCPServer:
             # 清理资源
             self.session = None
             self._client = None
-            
-            # 关闭所有资源
-            await exit_stack.aclose()
+            try:
+                # 关闭所有资源
+                await exit_stack.aclose()
+            except Exception as e:
+                logger.opt(exception=e).error(f"error occured during shutting down handle of: {self.server_config.id}")
             
             # 如果状态仍然是 DISCONNECTING，则更新为 DISCONNECTED
             if self.state == MCPConnectionState.DISCONNECTING:
