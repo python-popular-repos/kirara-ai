@@ -31,7 +31,7 @@ async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextConte
                 raise ValueError(f"Media {input.media_id} not found")
             results.append({
                 "content": [
-                    {"type": "text", "text": media.description},
+                    {"type": "text", "text": "" if (desc := media.description) is None else desc},
                     {"type": "image_base64", "image_base64": await media.get_base64()}
                 ]
             })
@@ -200,6 +200,6 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
             usage = Usage(
                 total_tokens = response_data["usage"].get("total_tokens", 0)
             ),
-            sort = req.sort
+            sort = cast(bool, req.sort) # 强制类型转换，避免mypy报错。
         )
         

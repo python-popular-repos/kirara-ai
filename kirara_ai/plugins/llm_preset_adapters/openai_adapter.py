@@ -22,7 +22,7 @@ from .utils import guess_openai_model, pick_tool_calls
 
 logger = get_logger("OpenAIAdapter")
 
-async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list | list[dict]:
+async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaManager) -> list[dict]:
     if messages.role == "tool":
         # typing.cast 指定类型，避免mypy报错
         elements = cast(list[LLMToolResultContent], messages.content)
@@ -81,10 +81,9 @@ async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaMa
             response["tool_calls"] = tool_calls
         return [response]
 
-def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
-    results = asyncio.run(
-        asyncio.gather(*[convert_parts_factory(msg, media_manager) for msg in messages])
-    )
+async def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
+    # gather 必须先包一层异步函数，转化为协程对象， 否侧报错
+    results = await asyncio.gather(*[convert_parts_factory(msg, media_manager) for msg in messages])
     # 扁平化结果, 展开所有列表
     return [item for sublist in results for item in sublist]
 
@@ -122,7 +121,7 @@ class OpenAIAdapterChatBase(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChat
             "messages": convert_llm_chat_message_to_openai_message(req.messages, self.media_manager),
             "model": req.model,
             "frequency_penalty": req.frequency_penalty,
-            "max_tokens": req.max_tokens,
+            "max_completion_tokens": req.max_tokens, # 最新的reference废除max_tokens，改为如上参数
             "presence_penalty": req.presence_penalty,
             "response_format": req.response_format,
             "stop": req.stop,

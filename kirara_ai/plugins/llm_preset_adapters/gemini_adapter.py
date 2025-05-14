@@ -89,6 +89,10 @@ async def convert_llm_chat_message_to_gemini_message(msg: LLMChatMessage, media_
     else:
         raise ValueError(f"Invalid role: {msg.role}")
 
+async def convert_all_messages_to_gemini_format(messages: List[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
+    # gather需要先用异步函数封装，然后才能使用asyncio.run()
+    return await asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, media_manager) for msg in messages])
+
 def convert_tools_to_gemini_format(tools: list[Tool]) -> list[dict[Literal["function_declarations"], list[dict]]]:
     # 定义允许的字段结构
     allowed_keys = {
@@ -178,7 +182,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
             response_modalities.append("image")
 
         data = {
-            "contents": asyncio.run(asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages])),
+            "contents": asyncio.run(convert_all_messages_to_gemini_format(req.messages, self.media_manager)),
             "generationConfig": {
                 "temperature": req.temperature,
                 "topP": req.top_p,

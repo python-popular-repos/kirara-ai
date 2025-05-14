@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 import pytest
 from kirara_ai.media.manager import MediaManager
-from kirara_ai.media import Media
 from kirara_ai.ioc.container import DependencyContainer
 
 from .mock_app import app
@@ -51,11 +50,12 @@ def mock_endpoint_test_client():
     with TestClient(app) as client:
         yield client
 
-class MockMedia(MagicMock, Media):
+class MockMedia(MagicMock):
     async def get_base64(self) -> str:
         return "data:image/png;base64,mock"
+    
     async def get_url(self) -> str:
-        return "https://example.com/image.png"
+        return "https://example.com/mock_image.png"
     
     @property
     def description(self) -> str:

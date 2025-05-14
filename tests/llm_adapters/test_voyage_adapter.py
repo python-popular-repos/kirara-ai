@@ -43,7 +43,7 @@ class TestVoyageAdapter:
         response = voyage_adapter.embed(req)
         assert isinstance(response, LLMEmbeddingResponse)
         assert response.vectors[0] == REFERENCE_VECTOR
-        assert response.usage.total_tokens == 3576
+        assert response.usage.total_tokens == 3576 #type: ignore
 
     def test_rerank_without_sort(self, voyage_adapter: VoyageAdapter):
         req = LLMReRankRequest(

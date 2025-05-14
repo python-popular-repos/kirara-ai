@@ -3,14 +3,13 @@ from kirara_ai.llm.format.message import LLMChatTextContent, LLMChatImageContent
 from kirara_ai.llm.format.embedding import LLMEmbeddingRequest, LLMEmbeddingResponse
 
 import pytest
-from .mock_app import REFERENCE_VECTOR, AUTH_KEY, OLLAMA_ENDPOINT
+from .mock_app import REFERENCE_VECTOR, OLLAMA_ENDPOINT
 
 class TestOllamaAdapter:
     @pytest.fixture(scope="class")
     def ollama_adapter(self, mock_media_manager) -> OllamaAdapter:
         config = OllamaConfig(
             api_base=OLLAMA_ENDPOINT,
-            api_key=AUTH_KEY,
         )
         adapter = OllamaAdapter(config)
         adapter.media_manager = mock_media_manager
