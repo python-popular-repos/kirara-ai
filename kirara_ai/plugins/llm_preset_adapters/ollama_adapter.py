@@ -172,7 +172,7 @@ class OllamaAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
         # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings api文档地址
         api_url = f"{self.config.api_base}/api/embed"
         headers = {"Content-Type": "application/json"}
-        if not all(isinstance(input, LLMChatTextContent) for input in req.inputs):
+        if any(isinstance(input, LLMChatImageContent) for input in req.inputs):
             raise ValueError("ollama api does not support multi-modal embedding")
         inputs = cast(list[LLMChatTextContent], req.inputs)
         data = {

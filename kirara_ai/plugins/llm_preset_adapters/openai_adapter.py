@@ -81,8 +81,8 @@ async def convert_parts_factory(messages: LLMChatMessage, media_manager: MediaMa
             response["tool_calls"] = tool_calls
         return [response]
 
-def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager, loop: asyncio.AbstractEventLoop) -> list[dict]:
-    results = loop.run_until_complete(
+def convert_llm_chat_message_to_openai_message(messages: list[LLMChatMessage], media_manager: MediaManager) -> list[dict]:
+    results = asyncio.run(
         asyncio.gather(*[convert_parts_factory(msg, media_manager) for msg in messages])
     )
     # 扁平化结果, 展开所有列表
@@ -98,30 +98,6 @@ def convert_tools_to_openai_format(tools: list[Tool]) -> list[dict]:
             "strict": tool.strict,
         }
     } for tool in tools]
-    
-class EmbeddingData(TypedDict):
-    object: Literal["embedding"]
-    embedding: list[float]
-    index: int
-
-class EmbeddingResponse(TypedDict):
-    # 用于描述类型定义
-    object: Literal["list"]
-    data: list[EmbeddingData]
-    model: str
-    usage: dict[Literal["prompt_tokens", "total_tokens"], int]
-
-class EmbeddingData(TypedDict):
-    object: Literal["embedding"]
-    embedding: list[float]
-    index: int
-
-class EmbeddingResponse(TypedDict):
-    # 用于描述类型定义
-    object: Literal["list"]
-    data: list[EmbeddingData]
-    model: str
-    usage: dict[Literal["prompt_tokens", "total_tokens"], int]
 
 class OpenAIConfig(BaseModel):
     api_key: str
@@ -142,11 +118,8 @@ class OpenAIAdapterChatBase(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChat
             "Content-Type": "application/json",
         }
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         data = {
-            "messages": convert_llm_chat_message_to_openai_message(req.messages, self.media_manager, loop),
+            "messages": convert_llm_chat_message_to_openai_message(req.messages, self.media_manager),
             "model": req.model,
             "frequency_penalty": req.frequency_penalty,
             "max_tokens": req.max_tokens,
@@ -230,6 +203,18 @@ class OpenAIAdapterChatBase(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChat
             all_models.append(ModelConfig(id=model, type=guess_result[0].value, ability=guess_result[1]))
         return all_models
     
+class EmbeddingData(TypedDict):
+    object: Literal["embedding"]
+    embedding: list[float]
+    index: int
+
+class EmbeddingResponse(TypedDict):
+    # 用于描述类型定义
+    object: Literal["list"]
+    data: list[EmbeddingData]
+    model: str
+    usage: dict[Literal["prompt_tokens", "total_tokens"], int]
+
 class OpenAIAdapter(OpenAIAdapterChatBase, LLMEmbeddingProtocol):
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         """
@@ -246,7 +231,7 @@ class OpenAIAdapter(OpenAIAdapterChatBase, LLMEmbeddingProtocol):
         if len(req.inputs) > 2048:
             # text数组不能超过2048个元素，openai api限制
             raise ValueError("Text list has too many dimensions, max dimension is 2048")
-        if not all(isinstance(input, LLMChatTextContent) for input in req.inputs):
+        if any(isinstance(input, LLMChatImageContent) for input in req.inputs):
             # 未在api中发现多模态嵌入api, 等待后续更新
             raise ValueError("openai does not support multi-modal embedding")
         # mypy 类型检查修复，如果添加多模态请去除这个标注

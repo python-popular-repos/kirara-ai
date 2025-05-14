@@ -166,22 +166,19 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
 
     @trace_llm_chat
     def chat(self, req: LLMChatRequest) -> LLMChatResponse:
-        api_url = f"{self.config.api_base}/models/{req.model}:generateContent"
+        api_url = f"{self.config.api_base}/models/{req.model}:generateContent?key={self.config.api_key}"
         headers = {
-            "x-goog-api-key": self.config.api_key,
+            # 这里的 api key 验证方法和 api reference 不一致。本次处理暂时按照api reference写法更正。 Warning: 未进行实际测试
+            # "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-
-        # create a new asyncio loop to run the convert_llm_chat_message_to_gemini_message function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
         response_modalities = ["text"]
         if req.model in IMAGE_MODAL_MODELS:
             response_modalities.append("image")
 
         data = {
-            "contents": loop.run_until_complete(asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages])),
+            "contents": asyncio.run(asyncio.gather(*[convert_llm_chat_message_to_gemini_message(msg, self.media_manager) for msg in req.messages])),
             "generationConfig": {
                 "temperature": req.temperature,
                 "topP": req.top_p,
@@ -213,7 +210,7 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
                 content.append(LLMChatTextContent(text=part["text"]))
             elif "inlineData" in part:
                 decoded_image_data = base64.b64decode(part["inlineData"]["data"])
-                media = loop.run_until_complete(
+                media = asyncio.run(
                     self.media_manager.register_from_data(
                         data=decoded_image_data,
                         format=part["inlineData"]["mimeType"].removeprefix(
@@ -252,12 +249,13 @@ class GeminiAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
     
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         # 使用批量嵌入接口，单次嵌入接口:embedContent
-        api_url = f"{self.config.api_base}/models/{req.model}:batchEmbedContents"
+        # gemini 的 API reference 是这样定义的很奇怪，居然敢在 url 中传递key
+        api_url = f"{self.config.api_base}/models/{req.model}:batchEmbedContents?key={self.config.api_key}"
         headers = {
-            "x-goog-api-key": self.config.api_key,
             "Content-Type": "application/json",
         }
-        if not all(isinstance(input, LLMChatTextContent) for input in req.inputs):
+        # 目前 gemini 没有一个嵌入模型支持多模态嵌入
+        if  any(isinstance(input, LLMChatImageContent) for input in req.inputs):
             raise ValueError("gemini does not support multi-modal embedding")
         inputs = cast(list[LLMChatTextContent], req.inputs)
         data = [ 

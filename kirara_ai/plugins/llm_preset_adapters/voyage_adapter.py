@@ -17,24 +17,23 @@ logger = get_logger("VoyageAdapter")
 async def resolve_media_base64(inputs: list[LLMChatImageContent|LLMChatTextContent], media_manager: MediaManager) -> list:
     results = []
     for input in inputs:
-        # 因为inputs字段对其中每个元素具有资源显示且较为容易达到
-        # 所以将所有输入放到不同的包含键 content 的字典中，而不是放入单个 content所以对应的列表
+        # voyage 的多模态接口设置中会将 一个content字段中的所有payload视作一个输入集，并对这个输入集合生成一个向量.
+        # 所以这里对 image 做出处理，将其描述与原始图像打包为一个payload.
         if isinstance(input, LLMChatTextContent):
             results.append({
-                "content": [{
-                    "type": "text",
-                    "text": input.text
-                }]
+                "content": [
+                    {"type": "text", "text": input.text}
+                ]
             })
         elif isinstance(input, LLMChatImageContent):
             media = media_manager.get_media(input.media_id)
             if media is None:
                 raise ValueError(f"Media {input.media_id} not found")
             results.append({
-                "content": [{
-                    "type": "image_base64",
-                    "image_base64": await media.get_base64()
-                }]
+                "content": [
+                    {"type": "text", "text": media.description},
+                    {"type": "image_base64", "image_base64": await media.get_base64()}
+                ]
             })
     return results
 
@@ -80,12 +79,13 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         self.config = config
     
     def embed(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
-        # voyage 支持多模态嵌入, 但是两个接口支持的参数不同
-        if all(isinstance(input, LLMChatTextContent) for input in req.inputs):
-            return self._text_embedding(req)
+        # voyage 支持多模态嵌入, 但是两个接口支持的参数不同。
+        # 因此对其做区分，以充分利用 voyage 接口提供的可选参数。
+        if any(isinstance(input, LLMChatImageContent) for input in req.inputs):
+            return self._multi_modal_embedding(req)
         else:
-            return self._multi_modal_embedding(req, self.media_manager)
-       
+            return self._text_embedding(req)
+        
     def _text_embedding(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         api_url = f"{self.config.api_base}/v1/embeddings"
         headers = {
@@ -119,23 +119,31 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
             )
         )
     
-    def _multi_modal_embedding(self, req: LLMEmbeddingRequest, media_manager: MediaManager) -> LLMEmbeddingResponse:
+    def _multi_modal_embedding(self, req: LLMEmbeddingRequest) -> LLMEmbeddingResponse:
         api_url = f"{self.config.api_base}/v1/multimodalembeddings"
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json"
         }
-        # 避免当前线程存在事件循环导致 RuntimeError. 一个线程只能有一个事件循环循环
-        try: 
-            # 自python 3.12 起使用该函数将抛出 **弃用** 警告，请尝试该用 asyncio.get_running_loop() Added in version 3.7
-            # loop = asyncio.get_event_loop()
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        
+        # loop = asyncio.new_event_loop()
+        # try:
+        #     asyncio.set_event_loop(loop)
+        #     data = {
+        #         "model": req.model,
+        #         "inputs": loop.run_until_complete(resolve_media_base64(req.inputs, self.media_manager)),
+        #         "input_type": req.input_type,
+        #         "truncation": req.truncate,
+        #         "output_encoding": req.encoding_format
+        #     }
+        # finally:
+        #     loop.close() # 关闭事件循环，避免资源泄露。
+        #     asyncio.set_event_loop(None) # 解除 asyncio 事件循环绑定。避免get_running_loop()获取到已结束时间循环。
+
         data = {
             "model": req.model,
-            "inputs": loop.run_until_complete(resolve_media_base64(req.inputs, media_manager)),
+            # 为何不使用神奇的 asyncio.run() 自动管理这个临时loop的生命周期呢。（python 3.7+）
+            "inputs": asyncio.run(resolve_media_base64(req.inputs, self.media_manager)),
             "input_type": req.input_type,
             "truncation": req.truncate,
             "output_encoding": req.encoding_format
@@ -179,6 +187,7 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         try:
             response.raise_for_status()
             response_data: ReRankResponse = response.json()
+            logger.debug(f"server  response_data: {response_data}")
         except Exception as e:
             logger.error(f"Response: {response.text}")
             raise e
@@ -186,10 +195,11 @@ class VoyageAdapter(LLMBackendAdapter, LLMEmbeddingProtocol, LLMReRankProtocol):
         return LLMReRankResponse(
             contents = [ReRankerContent(
                     document = data.get("document", None),
-                    relevance_score = data["relevance_score"]
+                    score = data["relevance_score"]
             ) for data in response_data["data"]],
             usage = Usage(
                 total_tokens = response_data["usage"].get("total_tokens", 0)
-            )
+            ),
+            sort = req.sort
         )
         

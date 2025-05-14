@@ -93,13 +93,11 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
         else:
             system_message = None
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         # 构建请求数据
 
         data = {
             "model": req.model,
-            "messages": loop.run_until_complete(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager)),
+            "messages": asyncio.run(convert_llm_chat_message_to_claude_message(req.messages, self.media_manager)),
             "max_tokens": req.max_tokens,
             "system": system_message,
             "temperature": req.temperature,
@@ -129,7 +127,7 @@ class ClaudeAdapter(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChatProtocol
                 content.append(LLMChatTextContent(text=res["text"]))
             elif res["type"] == "image":
                 image_data = base64.b64decode(res["source"]["data"])
-                media = loop.run_until_complete(self.media_manager.register_from_data(
+                media = asyncio.run(self.media_manager.register_from_data(
                     image_data, res["source"]["media_type"], source="claude response"))
                 content.append(LLMChatImageContent(media_id=media))
             elif res["type"] == "tool_use":
