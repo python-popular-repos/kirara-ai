@@ -4,13 +4,12 @@ from kirara_ai.llm.format.message import LLMChatTextContent, LLMChatImageContent
 from kirara_ai.llm.format.request import LLMChatRequest
 from kirara_ai.llm.format.response import LLMChatResponse
 
-from unittest.mock import patch
 import pytest
 
 from .mock_app import AUTH_KEY, REFERENCE_VECTOR, OPENAI_ENDPOINT
 class TestOpenAIAdapter:
     @pytest.fixture(scope="class")
-    def openai_adapter(self, mock_media_manager) -> OpenAIAdapter:
+    def openai_adapter(self, mock_media_manager, mock_tracer) -> OpenAIAdapter:
         # 能力有限没法在这里把patch整合进来
         config  = OpenAIConfig(
             api_base=OPENAI_ENDPOINT,
@@ -18,6 +17,8 @@ class TestOpenAIAdapter:
         )
         adapter = OpenAIAdapter(config)
         adapter.media_manager = mock_media_manager
+        adapter.backend_name = "openai"
+        adapter.tracer = mock_tracer
 
         return adapter
 
@@ -60,26 +61,24 @@ class TestOpenAIAdapter:
         with pytest.raises(HTTPError):
             openai_adapter.embed(req)
 
-    # patch不生效，跳过该项测试相信后人的智慧
-    @pytest.mark.skip(reason="patch装饰器未生效，该项测试完全无法进行")
     def test_normal_chat(self, openai_adapter: OpenAIAdapter):
-        with patch("kirara_ai.tracing.trace_llm_chat", lambda func: func):
-            req = LLMChatRequest(
-                messages=[
-                    LLMChatMessage(
-                        role="system",
-                        content=[
-                            LLMChatTextContent(text="你是一个猫娘。"),
-                            LLMChatTextContent(text="hello world")
-                        ]
-                    ),
-                ],
-                model="mock_chat",
-            )
+        req = LLMChatRequest(
+            messages=[
+                LLMChatMessage(
+                    role="system",
+                    content=[
+                        LLMChatTextContent(text="你是一个猫娘。"),
+                        LLMChatTextContent(text="hello world")
+                    ]
+                ),
+            ],
+            model="mock_chat",
+        )
 
-            response = openai_adapter.chat(req)
-            assert isinstance(response, LLMChatResponse)
-            assert response.message.content[0].text == "mock_response"
-            assert response.message.role == "assistant"
-            assert response.message.tool_calls is None
-            assert response.usage.total_tokens == 29 #type: ignore
+        response = openai_adapter.chat(req)
+        assert isinstance(response, LLMChatResponse)
+        assert isinstance(response.message.content[0], LLMChatTextContent)
+        assert response.message.content[0].text == "mock_response"
+        assert response.message.role == "assistant"
+        assert response.message.tool_calls is None
+        assert response.usage.total_tokens == 29 #type: ignore

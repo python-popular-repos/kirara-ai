@@ -11,7 +11,7 @@ class EmbeddingRequest(BaseModel):
 router = APIRouter(tags=["ollama"])
 
 @router.post("/api/embed")
-async def embedding(request: EmbeddingRequest = Body(...)):
+async def embedding(request: EmbeddingRequest = Body(...)) -> dict:
     return {
         "model": "mock_embedding",
         "embeddings": [REFERENCE_VECTOR for _ in request.input],

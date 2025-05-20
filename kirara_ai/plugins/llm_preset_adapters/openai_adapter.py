@@ -118,7 +118,7 @@ class OpenAIAdapterChatBase(LLMBackendAdapter, AutoDetectModelsProtocol, LLMChat
         }
         
         data = {
-            "messages": convert_llm_chat_message_to_openai_message(req.messages, self.media_manager),
+            "messages": asyncio.run(convert_llm_chat_message_to_openai_message(req.messages, self.media_manager)),
             "model": req.model,
             "frequency_penalty": req.frequency_penalty,
             "max_completion_tokens": req.max_tokens, # 最新的reference废除max_tokens，改为如上参数
@@ -222,7 +222,7 @@ class OpenAIAdapter(OpenAIAdapterChatBase, LLMEmbeddingProtocol):
         Tips: openai仅在 text-embedding-3 及以后模型中支持设定输出向量维度
         """
         
-        api_url = f"{self.config.api_base}/v1/embeddings"
+        api_url = f"{self.config.api_base}/embeddings"
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",

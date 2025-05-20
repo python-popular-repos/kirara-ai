@@ -36,7 +36,7 @@ class MultiModalRequest(BaseModel):
 router = APIRouter(tags=["voyage"])
 
 @router.post("/v1/embeddings")
-async def get_embeddings(request: EmbeddingRequest = Body(...)):
+async def get_embeddings(request: EmbeddingRequest = Body(...)) -> dict:
     return {
         "object": "list",
         "data": [
@@ -53,7 +53,7 @@ async def get_embeddings(request: EmbeddingRequest = Body(...)):
     }
 
 @router.post("/v1/multimodalembeddings")
-async def get_multimodal_embeddings(request: MultiModalRequest = Body(...)):
+async def get_multimodal_embeddings(request: MultiModalRequest = Body(...)) -> dict:
     return {
         "object": "list",
         "data": [
@@ -72,7 +72,7 @@ async def get_multimodal_embeddings(request: MultiModalRequest = Body(...)):
     }
 
 @router.post("/v1/rerank")
-async def get_rerank(request: ReRankRequest = Body(...)):
+async def get_rerank(request: ReRankRequest = Body(...)) -> dict:
     print(request)
     return {
         "object": "list",

@@ -111,7 +111,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(default=1, ge=0, le=2)
     tool_choice: Optional[str] = None
     tools: Optional[list] = None
-    top_logprobs: Optional[int] = Field(ge=0, le=20)
+    top_logprobs: Optional[int] = Field(default=None, ge=0, le=20)
     top_p: Optional[float] = 1
     user: Optional[str] = None
     web_search_options: Optional[dict] = None

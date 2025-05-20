@@ -2,6 +2,7 @@ from kirara_ai.plugins.llm_preset_adapters.voyage_adapter import VoyageAdapter, 
 from kirara_ai.llm.format.embedding import LLMEmbeddingRequest, LLMEmbeddingResponse
 from kirara_ai.llm.format.rerank import LLMReRankRequest, LLMReRankResponse
 from kirara_ai.llm.format.message import LLMChatTextContent, LLMChatImageContent
+from kirara_ai.llm.format.response import Usage
 
 import pytest
 
@@ -29,6 +30,7 @@ class TestVoyageAdapter:
         response = voyage_adapter.embed(req)
         assert isinstance(response, LLMEmbeddingResponse)
         assert response.vectors[0] == REFERENCE_VECTOR
+        assert isinstance(response.usage, Usage)
         assert response.usage.total_tokens == 10
 
     def test_multi_modal_embedding(self, voyage_adapter: VoyageAdapter):
@@ -43,7 +45,8 @@ class TestVoyageAdapter:
         response = voyage_adapter.embed(req)
         assert isinstance(response, LLMEmbeddingResponse)
         assert response.vectors[0] == REFERENCE_VECTOR
-        assert response.usage.total_tokens == 3576 #type: ignore
+        assert isinstance(response.usage, Usage)
+        assert response.usage.total_tokens == 3576
 
     def test_rerank_without_sort(self, voyage_adapter: VoyageAdapter):
         req = LLMReRankRequest(
@@ -63,6 +66,7 @@ class TestVoyageAdapter:
         assert response.contents[1].document == "I'm fine, thank you."
         assert response.contents[0].score == 0.4375
         assert response.contents[1].score == 0.421875
+        assert isinstance(response.usage, Usage)
         assert response.usage.total_tokens == 26
 
     def test_rerank_with_sort(self, voyage_adapter: VoyageAdapter):

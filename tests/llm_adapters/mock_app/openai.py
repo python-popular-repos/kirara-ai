@@ -6,8 +6,8 @@ from .models.openai import ChatRequest, EmbeddingRequest
 router = APIRouter(tags=["openai"])
 
 
-@router.post("/v1/chat/completions")
-async def completions(request: ChatRequest = Body(...)):
+@router.post("/chat/completions")
+async def completions(request: ChatRequest = Body(...)) -> dict:
     return {
         "id": "chatcmpl-B9MBs8CjcvOU2jLn4n570S5qMJKcT",
         "object": "chat.completion",
@@ -45,8 +45,8 @@ async def completions(request: ChatRequest = Body(...)):
     }
 
 
-@router.post("/v1/embeddings")
-async def embeddings(request: EmbeddingRequest = Body(...)):
+@router.post("/embeddings")
+async def embeddings(request: EmbeddingRequest = Body(...)) -> dict:
     return {
         "object": "list",
         "data": [

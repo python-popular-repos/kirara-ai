@@ -28,7 +28,7 @@ def mock_endpoint():
     thread.start()
 
     import time
-    time.sleep(2) # 等待fastapi服务启动完成。
+    time.sleep(2.5) # 等待fastapi服务启动完成。
     
     yield # 转出, 执行测试点
 
@@ -71,4 +71,18 @@ def mock_media_manager():
     # yield media_manager
     # 当你的fixture不需要执行清理逻辑时回收资源，可以不用 yield，直接 return。
     # yield 允许在 fixture中实现 [setup (准备)] 和 [teardown(清理)] 逻辑
-    return media_manager 
+    return media_manager
+
+class MockTracer(MagicMock):
+    def start_request_tracking(self, *_) -> str:
+        return "hello world"
+    
+    def fail_request_tracking(self, *_) -> None:
+        pass
+
+    def complete_request_tracking(self, *_) -> None:
+        pass
+
+@pytest.fixture(scope="module")
+def mock_tracer() -> MockTracer:
+    return MockTracer()
