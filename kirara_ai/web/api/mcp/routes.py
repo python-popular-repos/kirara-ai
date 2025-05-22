@@ -9,7 +9,7 @@ from quart import Blueprint, g, jsonify, request
 from kirara_ai.config.config_loader import CONFIG_FILE, ConfigLoader
 from kirara_ai.config.global_config import GlobalConfig, MCPServerConfig
 from kirara_ai.logger import get_logger
-from kirara_ai.mcp import MCPConnectionState, MCPServer, MCPServerManager
+from kirara_ai.mcp_module import MCPConnectionState, MCPServer, MCPServerManager
 
 from ...auth.middleware import require_auth
 from .models import (MCPServerCreateRequest, MCPServerInfo, MCPServerList, MCPServerUpdateRequest, MCPStatistics,

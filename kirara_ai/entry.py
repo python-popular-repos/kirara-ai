@@ -17,7 +17,7 @@ from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.llm.llm_manager import LLMManager
 from kirara_ai.llm.llm_registry import LLMBackendRegistry
 from kirara_ai.logger import get_logger
-from kirara_ai.mcp.manager import MCPServerManager
+from kirara_ai.mcp_module.manager import MCPServerManager
 from kirara_ai.media import MediaManager
 from kirara_ai.media.carrier import MediaCarrierRegistry, MediaCarrierService
 from kirara_ai.memory.composes import DefaultMemoryComposer, DefaultMemoryDecomposer, MultiElementDecomposer

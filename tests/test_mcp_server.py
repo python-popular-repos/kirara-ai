@@ -5,8 +5,8 @@ import pytest
 from mcp import types
 
 from kirara_ai.config.global_config import MCPServerConfig
-from kirara_ai.mcp.models import MCPConnectionState
-from kirara_ai.mcp.server import MCPServer
+from kirara_ai.mcp_module.models import MCPConnectionState
+from kirara_ai.mcp_module.server import MCPServer
 
 
 # 测试配置
@@ -68,8 +68,8 @@ def test_init(stdio_config):
 # 测试连接和断开连接
 @pytest.mark.asyncio
 async def test_connect_disconnect_stdio(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()
@@ -91,8 +91,8 @@ async def test_connect_disconnect_stdio(stdio_config):
 
 @pytest.mark.asyncio
 async def test_connect_disconnect_sse(sse_config):
-    with patch("kirara_ai.mcp.server.sse_client") as mock_sse_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.sse_client") as mock_sse_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()
@@ -122,8 +122,8 @@ async def test_connect_invalid_config(invalid_config):
 # 测试连接超时
 @pytest.mark.asyncio
 async def test_connect_timeout(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession") as mock_session:
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession") as mock_session:
         
         # 设置模拟返回值，但不设置连接完成事件
         mock_client = MagicMock()
@@ -140,8 +140,8 @@ async def test_connect_timeout(stdio_config):
 # 测试工具相关方法
 @pytest.mark.asyncio
 async def test_tool_methods(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()
@@ -164,8 +164,8 @@ async def test_tool_methods(stdio_config):
 # 测试补全方法
 @pytest.mark.asyncio
 async def test_complete(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()
@@ -183,8 +183,8 @@ async def test_complete(stdio_config):
 # 测试提示词相关方法
 @pytest.mark.asyncio
 async def test_prompt_methods(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()
@@ -207,8 +207,8 @@ async def test_prompt_methods(stdio_config):
 # 测试资源相关方法
 @pytest.mark.asyncio
 async def test_resource_methods(stdio_config):
-    with patch("kirara_ai.mcp.server.stdio_client") as mock_stdio_client, \
-         patch("kirara_ai.mcp.server.ClientSession", return_value=MockClientSession()):
+    with patch("kirara_ai.mcp_module.server.stdio_client") as mock_stdio_client, \
+         patch("kirara_ai.mcp_module.server.ClientSession", return_value=MockClientSession()):
         
         # 设置模拟返回值
         mock_client = MagicMock()

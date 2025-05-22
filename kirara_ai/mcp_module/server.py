@@ -12,7 +12,7 @@ from pydantic import AnyUrl
 
 from kirara_ai.config.global_config import MCPServerConfig
 from kirara_ai.logger import get_logger
-from kirara_ai.mcp.models import MCPConnectionState
+from .models import MCPConnectionState
 
 logger = get_logger("MCP.Server")
 
