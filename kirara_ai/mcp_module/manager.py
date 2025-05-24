@@ -11,8 +11,8 @@ from mcp.shared.session import RequestResponder
 from kirara_ai.config.global_config import GlobalConfig, MCPServerConfig
 from kirara_ai.ioc.container import DependencyContainer
 from kirara_ai.logger import get_logger
-from kirara_ai.mcp.models import MCPConnectionState
-from kirara_ai.mcp.server import MCPServer
+from .models import MCPConnectionState
+from .server import MCPServer
 
 logger = get_logger("MCP")
 

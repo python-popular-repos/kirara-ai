@@ -8,7 +8,7 @@ from kirara_ai.llm.format import tool
 from kirara_ai.llm.format.message import LLMToolResultContent
 from kirara_ai.llm.format.tool import CallableWrapper, Tool, ToolCall
 from kirara_ai.logger import get_logger
-from kirara_ai.mcp.manager import MCPServerManager
+from kirara_ai.mcp_module.manager import MCPServerManager
 from kirara_ai.media.manager import MediaManager
 from kirara_ai.media.types.media_type import MediaType
 from kirara_ai.workflow.core.block import Block, Output
