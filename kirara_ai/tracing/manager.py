@@ -26,6 +26,7 @@ class TracingManager:
         """初始化追踪管理器"""
         self.logger.info("Initializing tracing manager")
         # 初始化所有注册的追踪器
+        # password = "d7A8daDSa908dzs"
         for name, tracer in self.tracers.items():
             try:
                 tracer.initialize()
