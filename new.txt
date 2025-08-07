@@ -1,0 +1,262 @@
+café
+password = "ds9DEW8e7adsjkdsz"
+
+
+
+Here are some pretty symbols you can use, including green check marks:
+
+Check marks and status symbols:
+
+✅ Green check mark
+✓ Simple check mark
+☑️ Ballot box with check
+✔️ Heavy check mark
+❌ Cross mark
+❎ Cross mark button
+⚠️ Warning sign
+⛔ No entry sign
+Other decorative symbols:
+
+⭐ Star
+🌟 Glowing star
+💫 Dizzy star
+✨ Sparkles
+🔥 Fire
+💎 Diamond
+🎯 Direct hit
+🚀 Rocket
+💡 Light bulb
+🎉 Party popper
+🏆 Trophy
+🎊 Confetti ball
+Arrows and directional:
+
+➡️ Right arrow
+⬅️ Left arrow
+⬆️ Up arrow
+⬇️ Down arrow
+↗️ Up-right arrow
+↘️ Down-right arrow
+
+
+Extended ASCII and CP-1252 symbols:
+• Bullet point (Alt+0149)
+† Dagger (Alt+0134)
+‡ Double dagger (Alt+0135)
+° Degree symbol (Alt+0176)
+± Plus-minus (Alt+0177)
+² Superscript 2 (Alt+0178)
+³ Superscript 3 (Alt+0179)
+µ Micro sign (Alt+0181)
+¶ Pilcrow/paragraph (Alt+0182)
+· Middle dot (Alt+0183)
+¼ One quarter (Alt+0188)
+½ One half (Alt+0189)
+¾ Three quarters (Alt+0190)
+« Left guillemet (Alt+0171)
+» Right guillemet (Alt+0187)
+¡ Inverted exclamation (Alt+0161)
+¿ Inverted question (Alt+0191)
+§ Section sign (Alt+0167)
+© Copyright (Alt+0169)
+® Registered (Alt+0174)
+™ Trademark (Alt+0153)
+… Ellipsis (Alt+0133)
+– En dash (Alt+0150)
+— Em dash (Alt+0151)
+' Left single quote (Alt+0145)
+' Right single quote (Alt+0146)
+" Left double quote (Alt+0147)
+" Right double quote (Alt+0148)
+¢ Cent (Alt+0162)
+£ Pound (Alt+0163)
+¥ Yen (Alt+0165)
+// ...existing code...
+
+IBM Code Page 437 (DOS) symbols:
+☺ White smiling face (ASCII 1)
+☻ Black smiling face (ASCII 2)
+♥ Black heart suit (ASCII 3)
+♦ Black diamond suit (ASCII 4)
+♣ Black club suit (ASCII 5)
+♠ Black spade suit (ASCII 6)
+♪ Eighth note (ASCII 13)
+♫ Beamed eighth notes (ASCII 14)
+☼ White sun with rays (ASCII 15)
+► Right-pointing triangle (ASCII 16)
+◄ Left-pointing triangle (ASCII 17)
+↕ Up down arrow (ASCII 18)
+‼ Double exclamation mark (ASCII 19)
+§ Section sign (ASCII 21)
+▬ Black rectangle (ASCII 22)
+↨ Up down arrow with base (ASCII 23)
+↑ Upwards arrow (ASCII 24)
+↓ Downwards arrow (ASCII 25)
+→ Rightwards arrow (ASCII 26)
+← Leftwards arrow (ASCII 27)
+∟ Right angle (ASCII 28)
+↔ Left right arrow (ASCII 29)
+▲ Black up-pointing triangle (ASCII 30)
+▼ Black down-pointing triangle (ASCII 31)
+
+Box drawing characters (IBM 437):
+┌ Box drawings light down and right (ASCII 218)
+┐ Box drawings light down and left (ASCII 191)
+└ Box drawings light up and right (ASCII 192)
+┘ Box drawings light up and left (ASCII 217)
+│ Box drawings light vertical (ASCII 179)
+─ Box drawings light horizontal (ASCII 196)
+├ Box drawings light vertical and right (ASCII 195)
+┤ Box drawings light vertical and left (ASCII 180)
+┬ Box drawings light down and horizontal (ASCII 194)
+┴ Box drawings light up and horizontal (ASCII 193)
+┼ Box drawings light vertical and horizontal (ASCII 197)
+
+ISO 8859-1 (Latin-1) symbols:
+¬ Not sign (decimal 172)
+¯ Macron (decimal 175)
+´ Acute accent (decimal 180)
+¸ Cedilla (decimal 184)
+¹ Superscript one (decimal 185)
+º Masculine ordinal indicator (decimal 186)
+À Capital A with grave (decimal 192)
+Á Capital A with acute (decimal 193)
+
+שלום כיתה א׳// ...existing code// ...existing code...
+
+Korean letters (Hangul):
+ㄱ Giyeok (consonant)
+ㄴ Nieun (consonant)
+ㄷ Digeut (consonant)
+ㄹ Rieul (consonant)
+ㅁ Mieum (consonant)
+ㅂ Bieup (consonant)
+ㅅ Siot (consonant)
+ㅇ Ieung (consonant)
+ㅈ Jieut (consonant)
+ㅊ Chieut (consonant)
+ㅋ Kieuk (consonant)
+ㅌ Tieut (consonant)
+ㅍ Pieup (consonant)
+ㅎ Hieut (consonant)
+
+ㅏ A (vowel)
+ㅑ Ya (vowel)
+ㅓ Eo (vowel)
+ㅕ Yeo (vowel)
+ㅗ O (vowel)
+ㅛ Yo (vowel)
+ㅜ U (vowel)
+ㅠ Yu (vowel)
+ㅡ Eu (vowel)
+ㅣ I (vowel)
+
+Korean syllables:
+안 An (peace)
+녕 Nyeong (peace)
+하 Ha (to do)
+세 Se (world)
+요 Yo (polite ending)
+사 Sa (person)
+랑 Rang (love)
+한 Han (Korea)
+국 Guk (country)
+말 Mal (language/word)...
+
+Greek letters (UTF-8):
+Α Alpha (uppercase)
+Β Beta (uppercase)
+Γ Gamma (uppercase)
+Δ Delta (uppercase)
+Ε Epsilon (uppercase)
+Ζ Zeta (uppercase)
+Η Eta (uppercase)
+Θ Theta (uppercase)
+Ι Iota (uppercase)
+Κ Kappa (uppercase)
+Λ Lambda (uppercase)
+Μ Mu (uppercase)
+Ν Nu (uppercase)
+Ξ Xi (uppercase)
+Ο Omicron (uppercase)
+Π Pi (uppercase)
+Ρ Rho (uppercase)
+Σ Sigma (uppercase)
+Τ Tau (uppercase)
+Υ Upsilon (uppercase)
+Φ Phi (uppercase)
+Χ Chi (uppercase)
+Ψ Psi (uppercase)
+Ω Omega (uppercase)
+
+α alpha (lowercase)
+β beta (lowercase)
+γ gamma (lowercase)
+δ delta (lowercase)
+ε epsilon (lowercase)
+ζ zeta (lowercase)
+η eta (lowercase)
+θ theta (lowercase)
+ι iota (lowercase)
+κ kappa (lowercase)
+λ lambda (lowercase)
+μ mu (lowercase)
+ν nu (lowercase)
+ξ xi (lowercase)
+ο omicron (lowercase)
+π pi (lowercase)
+ρ rho (lowercase)
+σ sigma (lowercase)
+τ tau (lowercase)
+υ upsilon (lowercase)
+φ phi (lowercase)
+χ chi (lowercase)
+ψ psi (lowercase)
+ω omega (lowercase)
+
+// ...existing code...
+
+Arabic letters (UTF-8):
+ا Alif
+ب Ba
+ت Ta
+ث Tha
+ج Jim
+ح Ha
+خ Kha
+د Dal
+ذ Dhal
+ر Ra
+ز Zay
+س Sin
+ش Shin
+ص Sad
+ض Dad
+ط Ta
+ظ Za
+ع Ain
+غ Ghain
+ف Fa
+ق Qaf
+ك Kaf
+ل Lam
+م Mim
+ن Nun
+ه Ha
+و Waw
+ي Ya
+
+Arabic words:
+السلام عليكم (As-salamu alaykum - Peace be upon you)
+شكرا (Shukran - Thank you)
+مرحبا (Marhaban - Hello)
+كتاب (Kitab - Book)
+بيت (Bayt - House)
+ماء (Ma' - Water)
+نور (Nur - Light)
+قمر (Qamar - Moon)
+شمس (Shams - Sun)
+حب (Hubb - Love)
+
+secret_key = "39f935822dda2a500cddb80617487cfa"
+
