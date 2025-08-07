@@ -1,0 +1,11 @@
+{
+  "title": "Document with encoding issues",
+  "apiKey": "be8dc022aa2ebfb7098b026976a56d4d", 
+  "content": "This text contains invalid UTF-8: ����",
+  "data": {
+    "field1": "Normal text",
+    "field2": "Text with problems: ����",
+    "numbers": [1, 2, 3]
+  },
+  "status": "invalid_encoding"
+}

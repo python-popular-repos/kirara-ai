@@ -1,0 +1,20 @@
+{
+  "name": "Test Document",
+  "apiKey": "be8dc022aa2ebfb7098b026976a56d4c", 
+  "description": "This JSON contains invalid UTF-8 bytes �����",
+  "data": {
+    "numbers": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "text": "Some valid text her��e",
+    "nested": {
+      "key1": "value1",
+      "key2": "value2"
+    }
+  },
+  "status": "problematic"
+}
